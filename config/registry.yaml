@@ -1,0 +1,585 @@
+# =============================================================
+# REGISTRY DE FONTES — Cartas de Gestores
+# Fonte da verdade consumida pelo crawler (financenews).
+#
+# Origem: levantamento feito em conversa separada (claude.ai web),
+# materializado aqui em 2026-08-02. Campos `verificado`/`notas` de
+# algumas fontes foram atualizados nesta data com achados reais de
+# implementação (ver histórico de notas "[2026-08-02]").
+#
+# Campos:
+#   tier        1 = core (ler sempre) | 2 = rotação | 3 = eventual
+#   trilha      equity_br | macro_br | global | complemento
+#   cadencia    mensal | trimestral | semestral | anual | irregular | semanal | diaria
+#   janela      dias do mês em que costuma publicar (para agendar o crawl)
+#   url         página índice das cartas
+#   verificado  true  = URL confirmada (existe / é alcançável)
+#               false = precisa descoberta manual antes do primeiro crawl
+#   coleta      pattern_wp | scrape_index | mz_api | gated | manual | rss
+#   implementado true = tem estratégia de coleta funcionando no v1 do crawler
+#   notas       armadilhas conhecidas
+# =============================================================
+
+meta:
+  versao: "0.2"
+  perfil: "exploratorio — 2-3h/semana, diagnostico de vertical"
+  politica:
+    user_agent: "FinanceNews/0.1 (+paes.andre33@gmail.com; projeto pessoal de acompanhamento de cartas de gestores)"
+    respeitar_robots: true
+    delay_entre_requests_seg: 3
+    max_requests_por_dominio_dia: 50
+
+# -------------------------------------------------------------
+# AGREGADOR — usar como fonte de DESCOBERTA e validação cruzada
+# -------------------------------------------------------------
+agregadores:
+  - nome: Quem Tem Boca Investe
+    url: https://quemtembocainveste.com.br/cartas
+    verificado: true
+    coleta: scrape_index
+    notas: >
+      Cataloga cartas mensais de gestoras BR com link para o PDF original.
+      Excelente para descobrir URLs canônicas e detectar novas publicações.
+      Checar termos de uso antes de crawlear com frequência. Preferir sempre
+      baixar do site da gestora, usando o agregador só como índice.
+
+# -------------------------------------------------------------
+# TRILHA 1 — EQUITY BRASIL
+# -------------------------------------------------------------
+fontes:
+
+  - id: dynamo
+    nome: Dynamo
+    tier: 1
+    trilha: equity_br
+    cadencia: trimestral
+    janela: "~30-60 dias após fim do trimestre"
+    url: https://www.dynamo.com.br/2436-2/
+    verificado: true
+    coleta: scrape_index
+    implementado: true
+    notas: >
+      [2026-08-02] URL antiga do registry (/cartas-dynamo) hoje faz 301 para
+      /2436-2/ — atualizado aqui. Estrutura real: a página índice lista PDFs
+      diretos em wp-content/uploads/{AAAA}/{MM}/ para a maioria das cartas
+      recentes (ex.: Carta-Dynamo-127.pdf), mas a carta mais nova às vezes só
+      tem link para sua landing page própria (/carta-{N}-slug/), cujo PDF
+      precisa ser resolvido com um fetch adicional a essa página. Ano/mês
+      extraídos do path de upload (/uploads/AAAA/MM/), não do nome do
+      arquivo. robots.txt permissivo; sitemap em /wp-sitemap.xml como
+      fallback se a página índice mudar de novo.
+
+  - id: squadra
+    nome: Squadra Investimentos
+    tier: 1
+    trilha: equity_br
+    cadencia: semestral
+    janela: "irregular"
+    url: TBD
+    verificado: false
+    coleta: gated
+    implementado: false
+    notas: >
+      Exige cadastro. Cartas longas com análise contábil profunda.
+      Provavelmente coleta manual. Vale o esforço.
+
+  - id: ip_capital
+    nome: IP Capital Partners
+    tier: 1
+    trilha: equity_br
+    cadencia: trimestral
+    url: TBD
+    verificado: false
+    coleta: scrape_index
+    implementado: false
+
+  - id: brasil_capital
+    nome: Brasil Capital
+    tier: 2
+    trilha: equity_br
+    cadencia: trimestral
+    url: https://brasilcapital.com
+    verificado: true
+    coleta: pattern_wp
+    implementado: false
+    padrao_pdf: "https://brasilcapital.com/wp-content/uploads/{AAAA}/{MM}/Carta-BC_{NT}{AA}.pdf"
+
+  - id: organon
+    nome: Organon Capital
+    tier: 2
+    trilha: equity_br
+    cadencia: semestral
+    url: https://organoncapital.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: false
+    padrao_pdf: "https://organoncapital.com.br/wp-content/uploads/{AAAA}/{MM}/Carta_{N}_{NS}{AA}.pdf"
+
+  - id: guepardo
+    nome: Guepardo Investimentos
+    tier: 2
+    trilha: equity_br
+    cadencia: trimestral
+    url: https://www.guepardoinvest.com.br/cartas-da-gestora/
+    verificado: true
+    coleta: scrape_index
+    implementado: true
+    notas: >
+      [2026-08-02] Confirmado: página lista links diretos para PDFs no
+      próprio domínio raiz (não wp-content/uploads), padrão
+      Carta-{N}-Carta-aos-Investidores-{Trimestre}{AA}.pdf (ex.:
+      Carta-116-Carta-aos-Investidores-4T25.pdf). Cartas antigas (pré-2022)
+      usam mês abreviado em vez de trimestre (ex.: Carta-10-...-Abr07.pdf).
+      Trimestre mapeado para o mês final do trimestre (1T→03, 2T→06,
+      3T→09, 4T→12) para fins de ano/mês no índice.
+
+  - id: versa
+    nome: Versa Asset
+    tier: 3
+    trilha: equity_br
+    cadencia: mensal
+    janela: "10-20"
+    url: https://versaasset.com.br
+    verificado: true
+    coleta: scrape_index
+    implementado: false
+    notas: "Publica como post HTML, não PDF."
+
+  - id: constellation
+    nome: Constellation
+    tier: 2
+    trilha: equity_br
+    cadencia: trimestral
+    url: TBD
+    verificado: false
+    coleta: scrape_index
+    implementado: false
+
+  - id: atmos
+    nome: Atmos Capital
+    tier: 2
+    trilha: equity_br
+    cadencia: semestral
+    url: TBD
+    verificado: false
+    coleta: gated
+    implementado: false
+    notas: "Fundo fechado. Cartas circulam mas distribuição é restrita."
+
+  # Descobrir depois: Velt, Studio, Bogari, Tork, Trígono, Moat, Real Investor
+  - id: _fila_equity_br
+    nome: "FILA — descobrir URLs"
+    tier: 3
+    trilha: equity_br
+    cadencia: trimestral
+    url: TBD
+    verificado: false
+    coleta: manual
+    implementado: false
+    notas: "Velt, Studio, Bogari, Tork, Trígono, Moat, Real Investor, Oceana, Sharp, Núcleo"
+
+# -------------------------------------------------------------
+# TRILHA 2 — MACRO / MULTIMERCADO BRASIL
+# -------------------------------------------------------------
+
+  - id: verde
+    nome: Verde Asset
+    tier: 1
+    trilha: macro_br
+    cadencia: mensal
+    janela: "01-08"
+    url: https://www.verdeasset.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: false
+    padrao_pdf: "https://www.verdeasset.com.br/public/files/rel_gestao/{FUNDO_ID}/{Nome}-REL-{AAAA}_{MM}.pdf"
+    notas: >
+      [2026-08-02] Site é uma SPA (gerador "Infront 1.0") — o HTML inicial
+      não traz nenhum link, conteúdo é montado por JS a partir de dados
+      carregados depois (core.js/router.js não expõem endpoint óbvio numa
+      inspeção rápida). Precisa de investigação mais profunda (achar a
+      chamada JSON real, ou renderização via browser headless) antes de
+      dar pra implementar com HTTP simples. Fora do v1 por isso — não é
+      falta de tentativa, é um site genuinamente mais difícil que os outros.
+
+  - id: kinea
+    nome: Kinea
+    tier: 1
+    trilha: macro_br
+    cadencia: mensal
+    janela: "final do mês"
+    url: https://www.kinea.com.br/blog/categoria/carta-do-gestor/
+    verificado: true
+    coleta: scrape_index
+    implementado: true
+    notas: >
+      [2026-08-02] Confirmado: NÃO publica PDF — cada carta é um post HTML.
+      Melhor via REST API do WordPress:
+      https://www.kinea.com.br/wp-json/wp/v2/posts?categories=340
+      (340 = id da categoria "carta do gestor", obtido do header Link da
+      página índice). Retorna JSON com content.rendered em HTML; extração
+      é limpeza de HTML → texto, não pdfplumber.
+
+  - id: kapitalo
+    nome: Kapitalo
+    tier: 1
+    trilha: macro_br
+    cadencia: mensal
+    janela: "08-12"
+    url: https://www.kapitalo.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: false
+    padrao_pdf: "https://www.kapitalo.com.br/wp-content/uploads/2022/09/Carta-do-Gestor_K10-{Mes}{AAAA}.pdf"
+    notas: >
+      ATENÇÃO: o path de upload está congelado em 2022/09 mesmo para cartas
+      novas. Não inferir pela data — scrapear o índice.
+
+  - id: jgp
+    nome: JGP
+    tier: 2
+    trilha: macro_br
+    cadencia: mensal
+    janela: "05-10"
+    url: https://jgp.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: false
+    padrao_pdf: "https://jgp.com.br/wp-content/uploads/{AAAA}/{MM}/JGP_Carta-Macroeconomica_{Mes}{AA}.pdf"
+    notas: >
+      [2026-08-02] Conexão HTTPS falha consistentemente neste ambiente
+      (TLS handshake não completa, falha antes de qualquer resposta HTTP —
+      não é 403/bloqueio de UA, é a nível de conexão). HTTP puro dá 301
+      pra HTTPS, que falha do mesmo jeito. Hipótese: WAF bloqueando faixa
+      de IP de nuvem/datacenter — pode simplesmente funcionar rodando de
+      uma rede residencial normal. Vale testar de novo da sua máquina antes
+      de investir mais tempo nisso. Fora do v1 por ora, substituída por
+      Novus no lote inicial.
+
+  - id: genoa
+    nome: Genoa Capital
+    tier: 2
+    trilha: macro_br
+    cadencia: mensal
+    janela: "05-12"
+    url: https://www.genoacapital.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: true
+    padrao_pdf: "https://www.genoacapital.com.br/docs/CartaMensalGenoaCapital_{Mes}{AA}.pdf"
+    notas: >
+      [2026-08-02] Confirmado ao vivo: padrão exato, {Mes} = abreviação de
+      3 letras capitalizada (Jun, Jul...), {AA} = ano com 2 dígitos.
+      Padrão limpo e estável — usado como primeiro teste do crawler.
+
+  - id: bahia_asset
+    nome: Bahia Asset Management
+    tier: 2
+    trilha: macro_br
+    cadencia: mensal
+    janela: "01-05"
+    url: https://www.bahiaasset.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: true
+    padrao_pdf: "https://www.bahiaasset.com.br/wp-content/uploads/{AAAA}/{MM}/carta_do_gestor_{mes}{AA}.pdf"
+    notas: >
+      [2026-08-02] Confirmado ao vivo: {mes} = abreviação de 3 letras
+      MINÚSCULA (jun, jul...), {AA} = ano com 2 dígitos. {AAAA}/{MM} no
+      path de upload correspondem ao mês de publicação (aprox. mês
+      seguinte ao de referência). Incluída no lote v1 no lugar da Verde.
+
+  - id: armor
+    nome: Armor Capital
+    tier: 3
+    trilha: macro_br
+    cadencia: mensal
+    janela: "05-10"
+    url: https://armorcapital.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: false
+    padrao_pdf: "https://armorcapital.com.br/wp-content/uploads/{AAAA}/{MM}/{AAAA}{MM}_CartaMensalArmorCapital.pdf"
+
+  - id: novus
+    nome: Novus Capital
+    tier: 3
+    trilha: macro_br
+    cadencia: mensal
+    janela: "05-10"
+    url: https://novuscapital.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: true
+    padrao_pdf: "https://novuscapital.com.br/storage/carta-mensal/CM-{Mes}-{AAAA}.pdf"
+    notas: >
+      [2026-08-02] Confirmado ao vivo: {Mes} = nome completo capitalizado
+      (Junho, Julho...), {AAAA} = ano com 4 dígitos. Incluída no lote v1 no
+      lugar da JGP (conectividade instável nesse ambiente).
+
+  - id: az_quest
+    nome: AZ Quest
+    tier: 3
+    trilha: macro_br
+    cadencia: mensal
+    janela: "05-10"
+    url: https://azquest.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: false
+    padrao_pdf: "https://azquest.com.br/arquivos/carta/AZ Quest Carta Mensal {AAAA}_{MM}.pdf"
+    notas: "Espaços na URL — precisa urlencode."
+
+  - id: persevera
+    nome: Persevera
+    tier: 3
+    trilha: macro_br
+    cadencia: mensal
+    url: https://www.persevera.com.br
+    verificado: true
+    coleta: scrape_index
+    implementado: false
+    notas: "Post HTML com slug variável (título da carta). Não dá para inferir."
+
+  - id: kinitro
+    nome: Kínitro Capital
+    tier: 3
+    trilha: macro_br
+    cadencia: mensal
+    url: https://www.kinitro.com.br
+    verificado: true
+    coleta: pattern_wp
+    implementado: false
+    padrao_pdf: "https://www.kinitro.com.br/documentos/cartas/{AAAA}/{MM}/Carta Mensal Kínitro - {Mes}.{AA}.pdf"
+    notas: "Acento no path — cuidado com encoding UTF-8."
+
+  - id: garde
+    nome: Garde
+    tier: 3
+    trilha: macro_br
+    cadencia: mensal
+    url: https://www.garde.com.br/cartas-ao-gestor
+    verificado: true
+    coleta: scrape_index
+    implementado: false
+
+  - id: itau_artax
+    nome: Itaú Artax
+    tier: 3
+    trilha: macro_br
+    cadencia: mensal
+    url: TBD
+    verificado: false
+    coleta: mz_api
+    implementado: false
+    notas: >
+      Hospedado em api.mziq.com com UUID opaco. Impossível inferir —
+      obrigatoriamente parsear a página índice para extrair o link.
+      Mesmo caso da Quantitas.
+
+  - id: _fila_macro_br
+    nome: "FILA — descobrir URLs"
+    tier: 2
+    trilha: macro_br
+    cadencia: mensal
+    url: TBD
+    verificado: false
+    coleta: manual
+    implementado: false
+    notas: "SPX, Legacy, Ibiuna, Adam, Absolute, Truxt, Vinland, Mar Asset, Gávea, Ace"
+
+# -------------------------------------------------------------
+# TRILHA 3 — GLOBAL
+# -------------------------------------------------------------
+
+  - id: oaktree_marks
+    nome: Oaktree — Howard Marks Memos
+    tier: 1
+    trilha: global
+    cadencia: irregular
+    janela: "~6-8 por ano"
+    url: https://www.oaktreecapital.com/insights/memos
+    verificado: true
+    coleta: scrape_index
+    implementado: false
+    padrao_pdf: "https://www.oaktreecapital.com/docs/default-source/memos/{slug}.pdf?sfvrsn={hash}"
+    notas: >
+      Query string com hash impede inferência — parsear índice.
+      Leitura obrigatória. Existe também versão em áudio (podcast).
+
+  - id: berkshire
+    nome: Berkshire Hathaway — Carta Anual
+    tier: 1
+    trilha: global
+    cadencia: anual
+    janela: "último sábado de fevereiro"
+    url: https://www.berkshirehathaway.com/letters/letters.html
+    verificado: false
+    coleta: scrape_index
+    implementado: false
+    notas: >
+      A partir de 2026 escrita por Greg Abel (Buffett saiu do cargo de CEO
+      no fim de 2025, segue como Chairman). Site em HTML antigo e estável.
+
+  - id: apollo_slok
+    nome: Apollo — Torsten Slok (Daily Spark)
+    tier: 1
+    trilha: global
+    cadencia: diaria
+    url: TBD
+    verificado: false
+    coleta: rss
+    implementado: false
+    notas: "Gratuito. Alto volume — agregar semanalmente, não item a item."
+
+  - id: verdad
+    nome: Verdad Research
+    tier: 1
+    trilha: global
+    cadencia: semanal
+    url: TBD
+    verificado: false
+    coleta: rss
+    implementado: false
+    notas: "Gratuito, quant-value. Melhor relação sinal/ruído do bloco global."
+
+  - id: gmo
+    nome: GMO — Quarterly Letter
+    tier: 2
+    trilha: global
+    cadencia: trimestral
+    url: TBD
+    verificado: false
+    coleta: gated
+    implementado: false
+    notas: "Pode exigir cadastro gratuito."
+
+  - id: jpm_guide
+    nome: J.P. Morgan — Guide to the Markets
+    tier: 2
+    trilha: global
+    cadencia: trimestral
+    url: TBD
+    verificado: false
+    coleta: scrape_index
+    implementado: false
+    notas: "Não é carta — é deck de gráficos. Referência visual gratuita."
+
+  - id: kkr_mcvey
+    nome: KKR — Global Macro Trends (Henry McVey)
+    tier: 3
+    trilha: global
+    cadencia: trimestral
+    url: TBD
+    verificado: false
+    coleta: manual
+    implementado: false
+
+  - id: ruffer
+    nome: Ruffer (UK)
+    tier: 2
+    trilha: global
+    cadencia: mensal
+    url: TBD
+    verificado: false
+    coleta: manual
+    implementado: false
+
+  - id: fundsmith
+    nome: Fundsmith (Terry Smith)
+    tier: 3
+    trilha: global
+    cadencia: anual
+    janela: "janeiro"
+    url: TBD
+    verificado: false
+    coleta: manual
+    implementado: false
+
+  - id: marcellus
+    nome: Marcellus (Índia)
+    tier: 3
+    trilha: global
+    cadencia: semanal
+    url: TBD
+    verificado: false
+    coleta: rss
+    implementado: false
+
+# -------------------------------------------------------------
+# COMPLEMENTOS — camada de notícia e dado primário
+# -------------------------------------------------------------
+
+  - id: bcb_copom
+    nome: Banco Central — Ata do Copom
+    tier: 1
+    trilha: complemento
+    cadencia: irregular
+    janela: "terça seguinte à reunião, 8x/ano"
+    url: https://www.bcb.gov.br/publicacoes/atacopom
+    verificado: false
+    coleta: scrape_index
+    implementado: false
+    notas: "Fonte primária. Calendário publicado com um ano de antecedência."
+
+  - id: bcb_focus
+    nome: Banco Central — Relatório Focus
+    tier: 2
+    trilha: complemento
+    cadencia: semanal
+    janela: "segunda-feira"
+    url: https://www.bcb.gov.br/publicacoes/focus
+    verificado: false
+    coleta: scrape_index
+    implementado: false
+
+  - id: brazil_journal
+    nome: Brazil Journal
+    tier: 1
+    trilha: complemento
+    cadencia: diaria
+    url: TBD
+    verificado: false
+    coleta: rss
+    implementado: false
+
+  - id: neofeed
+    nome: NeoFeed
+    tier: 2
+    trilha: complemento
+    cadencia: diaria
+    url: TBD
+    verificado: false
+    coleta: rss
+    implementado: false
+
+# =============================================================
+# CALENDÁRIO DE CRAWL SUGERIDO
+# =============================================================
+agendamento:
+  diario_leve:
+    horario: "07:00"
+    alvos: [complemento, tier_1_rss]
+  janela_cartas_mensais:
+    dias_do_mes: [1, 3, 5, 8, 10, 12, 28, 30]
+    alvos: [macro_br]
+    notas: "Concentração real: dias 1-12 (mês anterior) e final do mês."
+  janela_cartas_trimestrais:
+    meses: [1, 2, 4, 5, 7, 8, 10, 11]
+    frequencia: semanal
+    alvos: [equity_br]
+    notas: "Trimestrais saem 30-60 dias após o fechamento. Varrer semanalmente."
+  irregulares:
+    frequencia: "2x por semana"
+    alvos: [oaktree_marks, squadra, atmos]
+
+# =============================================================
+# PIPELINE MÍNIMO
+# =============================================================
+pipeline:
+  - fetch: "HEAD antes de GET; respeitar delay"
+  - dedupe: "sha256 do binário + (gestora, ano, mes) como chave lógica"
+  - storage: "cartas/{trilha}/{gestora}/{AAAA}-{MM}-{slug}.{pdf|txt}"
+  - extract: "pdfplumber (PDF) ou limpeza de HTML (posts) → .txt ao lado do original"
+  - index: "cartas/index.json com metadados + status de leitura (lido/pendente)"
+  - alerta: "só notificar quando houver documento novo em tier 1 (não implementado no v1)"
