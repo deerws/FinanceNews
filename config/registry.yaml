@@ -98,22 +98,33 @@ fontes:
     tier: 2
     trilha: equity_br
     cadencia: trimestral
-    url: https://brasilcapital.com
+    url: https://brasilcapital.com/cartas-de-gestao/
     verificado: true
-    coleta: pattern_wp
-    implementado: false
+    coleta: scrape_index
+    implementado: true
     padrao_pdf: "https://brasilcapital.com/wp-content/uploads/{AAAA}/{MM}/Carta-BC_{NT}{AA}.pdf"
+    notas: >
+      [2026-08-02] Reclassificada de pattern_wp para scrape_index: a URL
+      não é inferível (placeholder {NT} nunca foi confirmado), mas a página
+      /cartas-de-gestao/ lista todos os PDFs diretamente, padrão
+      Carta-BC_{Trimestre}{AA}.pdf — cai no fallback genérico de scrape_index
+      (mesmo parser de trimestre usado na Guepardo).
 
   - id: organon
     nome: Organon Capital
     tier: 2
     trilha: equity_br
     cadencia: semestral
-    url: https://organoncapital.com.br
+    url: https://organoncapital.com.br/cartas/
     verificado: true
-    coleta: pattern_wp
-    implementado: false
+    coleta: scrape_index
+    implementado: true
     padrao_pdf: "https://organoncapital.com.br/wp-content/uploads/{AAAA}/{MM}/Carta_{N}_{NS}{AA}.pdf"
+    notas: >
+      [2026-08-02] Reclassificada de pattern_wp para scrape_index, mesmo
+      motivo da Brasil Capital. Página /cartas/ lista PDFs diretos, padrão
+      Carta_{N}_{Semestre}S{AA}.pdf (ex.: Carta_11_1S26-1.pdf) — precisou de
+      um regex de semestre novo (1S/2S) além do de trimestre já existente.
 
   - id: guepardo
     nome: Guepardo Investimentos
@@ -139,11 +150,15 @@ fontes:
     trilha: equity_br
     cadencia: mensal
     janela: "10-20"
-    url: https://versaasset.com.br
+    url: https://versaasset.com.br/categoria/cartas/
     verificado: true
     coleta: scrape_index
-    implementado: false
-    notas: "Publica como post HTML, não PDF."
+    implementado: true
+    notas: >
+      [2026-08-02] Publica como post HTML, não PDF (confirmado). A categoria
+      "cartas" mistura vários tipos de post (calls de resultado, menções na
+      imprensa) — filtra só slugs "resultado-mensal-{mes}-{aa}", que são as
+      cartas mensais de verdade.
 
   - id: constellation
     nome: Constellation
@@ -201,6 +216,7 @@ fontes:
       chamada JSON real, ou renderização via browser headless) antes de
       dar pra implementar com HTTP simples. Fora do v1 por isso — não é
       falta de tentativa, é um site genuinamente mais difícil que os outros.
+      [2026-08-02] Reteste: mesmo resultado, sem mudança.
 
   - id: kinea
     nome: Kinea
@@ -234,6 +250,13 @@ fontes:
     notas: >
       ATENÇÃO: o path de upload está congelado em 2022/09 mesmo para cartas
       novas. Não inferir pela data — scrapear o índice.
+      [2026-08-02] Tentei scrapear o índice: nem a home, nem /cartas-do-gestor,
+      nem /cartas-do-gestor/cartas-tematicas, nem a página do fundo K10 têm
+      link estático pra carta mensal (só material informativo/regulamento).
+      Site não é SPA (WordPress + jQuery normal) — carta provavelmente é
+      carregada via AJAX/admin-ajax.php disparado por interação, ou fica
+      atrás de área logada. Precisaria inspecionar o JS de verdade (scripts.js)
+      pra achar o endpoint — não investido ainda.
 
   - id: jgp
     nome: JGP
@@ -298,8 +321,11 @@ fontes:
     url: https://armorcapital.com.br
     verificado: true
     coleta: pattern_wp
-    implementado: false
+    implementado: true
     padrao_pdf: "https://armorcapital.com.br/wp-content/uploads/{AAAA}/{MM}/{AAAA}{MM}_CartaMensalArmorCapital.pdf"
+    notas: >
+      [2026-08-02] Confirmado ao vivo: pasta de upload é mes+1, nome do
+      arquivo usa o mês de referência (mesmo padrão da Bahia Asset).
 
   - id: novus
     nome: Novus Capital
@@ -326,20 +352,28 @@ fontes:
     url: https://azquest.com.br
     verificado: true
     coleta: pattern_wp
-    implementado: false
+    implementado: true
     padrao_pdf: "https://azquest.com.br/arquivos/carta/AZ Quest Carta Mensal {AAAA}_{MM}.pdf"
-    notas: "Espaços na URL — precisa urlencode."
+    notas: >
+      Espaços na URL — precisa urlencode.
+      [2026-08-02] Confirmado ao vivo, padrão exato como documentado
+      (%20 no lugar dos espaços).
 
   - id: persevera
     nome: Persevera
     tier: 3
     trilha: macro_br
     cadencia: mensal
-    url: https://www.persevera.com.br
+    url: https://www.persevera.com.br/blog-feed.xml
     verificado: true
     coleta: scrape_index
-    implementado: false
-    notas: "Post HTML com slug variável (título da carta). Não dá para inferir."
+    implementado: true
+    notas: >
+      Post HTML com slug variável (título da carta). Não dá para inferir.
+      [2026-08-02] Site é Wix (static.parastorage.com). Achado um RSS real em
+      /blog-feed.xml — usado em vez de scraping de HTML. A descrição no feed
+      parece ser um resumo/trecho, não o corpo completo do post; aceitável
+      por ora (tier 3), mas é uma limitação conhecida.
 
   - id: kinitro
     nome: Kínitro Capital
@@ -351,7 +385,14 @@ fontes:
     coleta: pattern_wp
     implementado: false
     padrao_pdf: "https://www.kinitro.com.br/documentos/cartas/{AAAA}/{MM}/Carta Mensal Kínitro - {Mes}.{AA}.pdf"
-    notas: "Acento no path — cuidado com encoding UTF-8."
+    notas: >
+      Acento no path — cuidado com encoding UTF-8.
+      [2026-08-02] Falso positivo inicial: uma URL de teste devolveu 200 com
+      um header que parecia real (accept-ranges: bytes), mas era o shell
+      HTML vazio do site (SPA, ~2KB, mesmo conteúdo pra qualquer path —
+      confirmado comparando bytes). Mesma categoria de bloqueio da Verde.
+      O crawler agora valida content-type antes de aceitar um hit de
+      pattern_wp, então isso não baixa lixo — só não acha nada.
 
   - id: garde
     nome: Garde
@@ -362,6 +403,12 @@ fontes:
     verificado: true
     coleta: scrape_index
     implementado: false
+    notas: >
+      [2026-08-02] Handshake TLS falha (SSL alert "handshake failure") direto
+      na conexão, antes de qualquer HTTP — diferente do bloqueio do JGP
+      (que nem chega a fazer handshake). Pode ser incompatibilidade de
+      cipher/versão TLS do lado deles, não necessariamente bloqueio
+      intencional. Vale retestar de outra rede antes de investir mais.
 
   - id: itau_artax
     nome: Itaú Artax
@@ -401,11 +448,17 @@ fontes:
     url: https://www.oaktreecapital.com/insights/memos
     verificado: true
     coleta: scrape_index
-    implementado: false
+    implementado: true
     padrao_pdf: "https://www.oaktreecapital.com/docs/default-source/memos/{slug}.pdf?sfvrsn={hash}"
     notas: >
       Query string com hash impede inferência — parsear índice.
       Leitura obrigatória. Existe também versão em áudio (podcast).
+      [2026-08-02] Índice tem cada memo num bloco <time datetime="..."> + <a>;
+      ~metade dos links é PDF direto via javascript:openPDF('titulo','url'),
+      a outra metade só tem página HTML própria (/insights/memo/slug).
+      Implementado só o primeiro caso (mais simples); os que só têm página
+      HTML ficam de fora por ora — perde alguns memos recentes, mas pega a
+      maioria. Limitado às ~10 entradas mais recentes da página.
 
   - id: berkshire
     nome: Berkshire Hathaway — Carta Anual

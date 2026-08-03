@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import typer
 
@@ -17,23 +17,21 @@ from .strategies import discover
 
 app = typer.Typer(add_completion=False)
 
-V1_SOURCES = ["genoa", "dynamo", "bahia_asset", "novus", "kinea", "guepardo"]
-
 
 def _slug_for(url: str) -> str:
-    stem = Path(urlparse(url).path).stem
+    stem = Path(unquote(urlparse(url).path)).stem
     return slugify(stem)
 
 
 @app.command()
 def crawl(
     source: list[str] = typer.Option(
-        [], "--source", "-s", help="IDs de fontes específicas (padrão: lote v1 de 6 fontes)"
+        [], "--source", "-s", help="IDs de fontes específicas (padrão: todas com implementado:true no registry)"
     ),
 ) -> None:
     """Busca cartas novas nas fontes configuradas e baixa para ./cartas/."""
-    ids = source or V1_SOURCES
     sources = load_sources()
+    ids = source or [sid for sid, src in sources.items() if src.implementado]
     index = IndexStore()
 
     novos = 0
@@ -61,41 +59,47 @@ def crawl(
                 if index.has(key):
                     continue
 
-                if cand.content_type == "pdf":
-                    resp = fetcher.get(cand.url)
-                    if resp is None:
-                        typer.echo(f"[{sid}] falha ao baixar {cand.url}")
-                        continue
-                    content = resp.content
-                    raw = raw_path(src.trilha, sid, cand.ano, cand.mes, slug, "pdf")
-                    raw.write_bytes(content)
-                    text = extract_text(raw)
-                else:
-                    html_content = cand.html_content or ""
-                    content = html_content.encode("utf-8")
-                    raw = raw_path(src.trilha, sid, cand.ano, cand.mes, slug, "html")
-                    raw.write_text(html_content, encoding="utf-8")
-                    text = extract_text(raw, html_content=html_content)
+                raw: Path | None = None
+                try:
+                    if cand.content_type == "pdf":
+                        resp = fetcher.get(cand.url)
+                        if resp is None:
+                            typer.echo(f"[{sid}] falha ao baixar {cand.url}")
+                            continue
+                        content = resp.content
+                        raw = raw_path(src.trilha, sid, cand.ano, cand.mes, slug, "pdf")
+                        raw.write_bytes(content)
+                        text = extract_text(raw)
+                    else:
+                        html_content = cand.html_content or ""
+                        content = html_content.encode("utf-8")
+                        raw = raw_path(src.trilha, sid, cand.ano, cand.mes, slug, "html")
+                        raw.write_text(html_content, encoding="utf-8")
+                        text = extract_text(raw, html_content=html_content)
 
-                txt = txt_path(raw)
-                txt.write_text(text, encoding="utf-8")
+                    txt = txt_path(raw)
+                    txt.write_text(text, encoding="utf-8")
 
-                record = LetterRecord(
-                    id=key,
-                    gestora=sid,
-                    trilha=src.trilha,
-                    tier=src.tier,
-                    ano=cand.ano,
-                    mes=cand.mes,
-                    url_origem=cand.url,
-                    arquivo_raw=str(raw.relative_to(DEFAULT_ROOT.parent)),
-                    arquivo_txt=str(txt.relative_to(DEFAULT_ROOT.parent)),
-                    sha256=sha256_of(content),
-                    baixado_em=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-                )
-                index.add(record)
-                novos += 1
-                typer.echo(f"[{sid}] novo: {cand.ano}-{cand.mes:02d} ({slug})")
+                    record = LetterRecord(
+                        id=key,
+                        gestora=sid,
+                        trilha=src.trilha,
+                        tier=src.tier,
+                        ano=cand.ano,
+                        mes=cand.mes,
+                        url_origem=cand.url,
+                        arquivo_raw=str(raw.relative_to(DEFAULT_ROOT.parent)),
+                        arquivo_txt=str(txt.relative_to(DEFAULT_ROOT.parent)),
+                        sha256=sha256_of(content),
+                        baixado_em=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+                    )
+                    index.add(record)
+                    novos += 1
+                    typer.echo(f"[{sid}] novo: {cand.ano}-{cand.mes:02d} ({slug})")
+                except Exception as exc:  # noqa: BLE001 - 1 carta ruim não pode derrubar o resto do crawl
+                    typer.echo(f"[{sid}] erro processando {cand.url}: {exc}")
+                    if raw is not None and raw.exists():
+                        raw.unlink()
 
     index.save()
     typer.echo(f"\nConcluído: {novos} carta(s) nova(s).")
