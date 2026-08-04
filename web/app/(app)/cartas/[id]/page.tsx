@@ -20,6 +20,15 @@ function formatarData(dataRef: string): string {
   return data.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 
+// Mesma lógica de índice que ConteudoTexto usa pra gerar os ids das seções —
+// splita nos mesmos blocos e conta só os que são título ("## ").
+function extrairSecoes(texto: string): string[] {
+  return texto
+    .split(/\n{2,}/)
+    .filter((b) => b.trim().startsWith("## "))
+    .map((b) => b.slice(3).trim());
+}
+
 export default async function CartaPage({
   params,
 }: {
@@ -41,6 +50,7 @@ export default async function CartaPage({
   const gestoraRel = carta.gestoras as { nome: string } | { nome: string }[] | null;
   const gestoraNome = Array.isArray(gestoraRel) ? gestoraRel[0]?.nome : gestoraRel?.nome;
   const lido = carta.leituras?.[0]?.status === "lido";
+  const secoes = extrairSecoes(carta.conteudo_txt);
 
   return (
     <div className="mx-auto max-w-2xl p-4">
@@ -77,6 +87,26 @@ export default async function CartaPage({
       </div>
 
       <hr className="mb-6 border-t-2 border-foreground" />
+
+      {secoes.length > 1 && (
+        <nav className="mb-8 border border-border bg-muted/40 p-4">
+          <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
+            Sumário
+          </p>
+          <ol className="space-y-1.5">
+            {secoes.map((secao, i) => (
+              <li key={i}>
+                <a
+                  href={`#secao-${i}`}
+                  className="font-serif text-sm underline decoration-border underline-offset-2 hover:decoration-foreground"
+                >
+                  {secao}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
 
       <ConteudoTexto texto={carta.conteudo_txt} />
     </div>

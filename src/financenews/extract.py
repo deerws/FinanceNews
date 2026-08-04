@@ -24,14 +24,29 @@ def _extract_pdf(path: Path) -> str:
     # quebra de linha do PDF — inclusive quebra no meio de uma frase por
     # causa da largura da página — vira \n, e não dá pra distinguir quebra
     # de parágrafo de quebra de linha).
-    output: list[str] = []
+    items: list[tuple[str, bool]] = []  # (texto, é_negrito)
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
             raw = page.extract_text(x_tolerance=1.5, layout=True) or ""
             paragraphs = _paragraphs_from_layout_text(raw)
             bold_lines = _bold_line_texts(page)
             for para in paragraphs:
-                output.append(f"## {para}" if para in bold_lines else para)
+                items.append((para, para in bold_lines))
+
+    # Cabeçalho/rodapé repetido (ex.: "Carta Mensal Junho/2026" em toda
+    # página) costuma vir em negrito também — sem filtrar isso, cada
+    # repetição vira um "título de seção" falso e polui o sumário. Título
+    # de verdade normalmente aparece uma vez só no documento.
+    bold_counts: dict[str, int] = {}
+    for texto, negrito in items:
+        if negrito:
+            bold_counts[texto] = bold_counts.get(texto, 0) + 1
+
+    output: list[str] = []
+    for texto, negrito in items:
+        if negrito and bold_counts[texto] > 1:
+            continue  # repetido em várias páginas — ruído de cabeçalho/rodapé
+        output.append(f"## {texto}" if negrito else texto)
     return "\n\n".join(output).strip()
 
 
