@@ -10,6 +10,7 @@ from supabase import Client, create_client
 
 from .dates import MESES_COMPLETO
 from .index_store import IndexStore
+from .notify import notificar_cartas_novas
 from .registry import load_sources
 from .storage import DEFAULT_ROOT
 
@@ -52,10 +53,11 @@ def _upsert_in_batches(client: Client, table: str, rows: list[dict]) -> None:
                 time.sleep(2 * tentativa)
 
 
-def ingest() -> tuple[int, int]:
+def ingest() -> tuple[int, int, int]:
     """Sincroniza gestoras + cartas com o Supabase. Idempotente (upsert por id).
+    Notifica por push quem segue a gestora de cada carta genuinamente nova.
 
-    Retorna (n_gestoras, n_cartas) enviadas.
+    Retorna (n_gestoras, n_cartas, n_notificacoes) enviadas.
     """
     client = _client()
     sources = load_sources()
@@ -74,8 +76,16 @@ def ingest() -> tuple[int, int]:
     ]
     _upsert_in_batches(client, "gestoras", gestoras_payload)
 
+    # Precisa saber quais ids já existiam ANTES do upsert pra separar carta
+    # genuinamente nova (dispara notificação) de atualização de uma já
+    # existente (ex.: reextração de texto não deve notificar de novo).
+    ids_existentes = {
+        row["id"] for row in client.table("cartas").select("id").execute().data
+    }
+
     letters = IndexStore().all()
     cartas_payload = []
+    metadados: dict[str, dict] = {}
     for letter in letters:
         src = sources.get(letter.gestora)
         gestora_nome = src.nome if src else letter.gestora
@@ -99,6 +109,14 @@ def ingest() -> tuple[int, int]:
                 "tier": letter.tier,
             }
         )
+        metadados[letter.id] = {"gestora_nome": gestora_nome, "titulo": titulo}
     _upsert_in_batches(client, "cartas", cartas_payload)
 
-    return len(gestoras_payload), len(cartas_payload)
+    novas = [
+        {"id": c["id"], "gestora_id": c["gestora_id"], **metadados[c["id"]]}
+        for c in cartas_payload
+        if c["id"] not in ids_existentes
+    ]
+    n_notificacoes = notificar_cartas_novas(client, novas)
+
+    return len(gestoras_payload), len(cartas_payload), n_notificacoes

@@ -10,6 +10,7 @@ dependencies = [
     "lxml>=6.1.1",
     "pdfplumber>=0.11.10",
     "python-dotenv>=1.2.2",
+    "pywebpush>=2.3.0",
     "pyyaml>=6.0.3",
     "supabase>=2.31.0",
     "typer>=0.27.0",

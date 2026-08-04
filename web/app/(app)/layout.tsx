@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,15 @@ export default async function AppLayout({
           </span>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="hidden sm:inline">{user?.email}</span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              render={
+                <Link href="/configuracoes" aria-label="Notificações">
+                  <Bell />
+                </Link>
+              }
+            />
             <form action={signOut}>
               <Button
                 type="submit"

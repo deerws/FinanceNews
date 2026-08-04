@@ -140,8 +140,8 @@ def ingest() -> None:
     from .ingest import ingest as run_ingest
 
     load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
-    n_gestoras, n_cartas = run_ingest()
-    typer.echo(f"Sincronizado: {n_gestoras} gestoras, {n_cartas} cartas.")
+    n_gestoras, n_cartas, n_notificacoes = run_ingest()
+    typer.echo(f"Sincronizado: {n_gestoras} gestoras, {n_cartas} cartas, {n_notificacoes} notificações enviadas.")
 
 
 def main() -> None:
