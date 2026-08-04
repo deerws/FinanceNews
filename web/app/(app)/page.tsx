@@ -14,9 +14,12 @@ export default async function HomePage({
   const params = await searchParams;
   const gestorasSelecionadas =
     typeof params.gestoras === "string" ? params.gestoras.split(",").filter(Boolean) : [];
+  const trilhasSelecionadas =
+    typeof params.trilha === "string" ? params.trilha.split(",").filter(Boolean) : [];
   const de = typeof params.de === "string" ? params.de : undefined;
   const ate = typeof params.ate === "string" ? params.ate : undefined;
   const q = typeof params.q === "string" ? params.q : undefined;
+  const naoLidos = params.naoLidos === "1";
   const limit = typeof params.limit === "string" ? Number(params.limit) : PAGE_SIZE;
 
   const supabase = await createClient();
@@ -34,14 +37,32 @@ export default async function HomePage({
   if (gestorasSelecionadas.length > 0) {
     cartasQuery = cartasQuery.in("gestora_id", gestorasSelecionadas);
   }
+  if (trilhasSelecionadas.length > 0) {
+    cartasQuery = cartasQuery.in("trilha", trilhasSelecionadas);
+  }
   if (de) cartasQuery = cartasQuery.gte("data_referencia", de);
   if (ate) cartasQuery = cartasQuery.lte("data_referencia", ate);
   if (q) cartasQuery = cartasQuery.textSearch("busca", q, { type: "websearch", config: "portuguese" });
 
-  const [{ data: gestorasComCartas }, { data: cartas, error }] = await Promise.all([
+  const [{ data: gestorasComCartas }, lidoIds] = await Promise.all([
     gestorasQuery,
-    cartasQuery,
+    naoLidos
+      ? supabase
+          .from("leituras")
+          .select("carta_id")
+          .eq("status", "lido")
+          .then((r) => r.data ?? [])
+      : Promise.resolve<{ carta_id: string }[]>([]),
   ]);
+  if (naoLidos && lidoIds.length > 0) {
+    cartasQuery = cartasQuery.not(
+      "id",
+      "in",
+      `(${lidoIds.map((l) => `"${l.carta_id}"`).join(",")})`,
+    );
+  }
+
+  const { data: cartas, error } = await cartasQuery;
 
   const gestoras: GestoraOption[] = (gestorasComCartas ?? [])
     .filter((g) => {

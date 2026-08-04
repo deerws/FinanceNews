@@ -9,6 +9,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 export type GestoraOption = { id: string; nome: string };
 
+const TRILHAS = [
+  { id: "equity_br", label: "Equity BR" },
+  { id: "macro_br", label: "Macro BR" },
+  { id: "global", label: "Global" },
+  { id: "complemento", label: "Complemento" },
+] as const;
+
 export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -16,22 +23,38 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
   const gestorasAtivas = new Set(
     (searchParams.get("gestoras") ?? "").split(",").filter(Boolean),
   );
+  const trilhasAtivas = new Set(
+    (searchParams.get("trilha") ?? "").split(",").filter(Boolean),
+  );
   const [selecionadas, setSelecionadas] = useState<Set<string>>(gestorasAtivas);
+  const [trilhasSel, setTrilhasSel] = useState<Set<string>>(trilhasAtivas);
   const [de, setDe] = useState(searchParams.get("de") ?? "");
   const [ate, setAte] = useState(searchParams.get("ate") ?? "");
   const [busca, setBusca] = useState(searchParams.get("q") ?? "");
+  const [naoLidos, setNaoLidos] = useState(searchParams.get("naoLidos") === "1");
 
-  function aplicar(next: { gestoras?: Set<string>; de?: string; ate?: string; q?: string }) {
+  function aplicar(next: {
+    gestoras?: Set<string>;
+    trilha?: Set<string>;
+    de?: string;
+    ate?: string;
+    q?: string;
+    naoLidos?: boolean;
+  }) {
     const g = next.gestoras ?? selecionadas;
+    const t = next.trilha ?? trilhasSel;
     const d = next.de ?? de;
     const a = next.ate ?? ate;
     const q = next.q ?? busca;
+    const nl = next.naoLidos ?? naoLidos;
 
     const params = new URLSearchParams();
     if (g.size > 0) params.set("gestoras", Array.from(g).join(","));
+    if (t.size > 0) params.set("trilha", Array.from(t).join(","));
     if (d) params.set("de", d);
     if (a) params.set("ate", a);
     if (q) params.set("q", q);
+    if (nl) params.set("naoLidos", "1");
 
     router.push(params.size > 0 ? `/?${params.toString()}` : "/");
   }
@@ -44,7 +67,21 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     aplicar({ gestoras: next });
   }
 
-  const temFiltro = selecionadas.size > 0 || de || ate || busca;
+  function toggleTrilha(id: string) {
+    const next = new Set(trilhasSel);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setTrilhasSel(next);
+    aplicar({ trilha: next });
+  }
+
+  function toggleNaoLidos() {
+    const next = !naoLidos;
+    setNaoLidos(next);
+    aplicar({ naoLidos: next });
+  }
+
+  const temFiltro = selecionadas.size > 0 || trilhasSel.size > 0 || de || ate || busca || naoLidos;
 
   return (
     <div className="space-y-2">
@@ -75,6 +112,26 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
         )}
       </div>
 
+      <div className="flex flex-wrap items-center gap-1.5">
+        {TRILHAS.map((t) => {
+          const ativa = trilhasSel.has(t.id);
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => toggleTrilha(t.id)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                ativa
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-input text-muted-foreground hover:border-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <Popover>
           <PopoverTrigger
@@ -98,6 +155,14 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
             </div>
           </PopoverContent>
         </Popover>
+
+        <Button
+          variant={naoLidos ? "default" : "outline"}
+          size="sm"
+          onClick={toggleNaoLidos}
+        >
+          Só não lidos
+        </Button>
 
         <input
           type="date"
@@ -127,9 +192,11 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
             size="sm"
             onClick={() => {
               setSelecionadas(new Set());
+              setTrilhasSel(new Set());
               setDe("");
               setAte("");
               setBusca("");
+              setNaoLidos(false);
               router.push("/");
             }}
           >
