@@ -80,3 +80,5 @@ def _enviar_push(sub: dict, carta: dict, vapid_private_key: str, vapid_subject: 
         if status in (404, 410):
             return None
         return False
+    except Exception:  # noqa: BLE001 - endpoint morto/rede indisponível não pode derrubar o ingest inteiro
+        return False
