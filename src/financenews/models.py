@@ -45,3 +45,4 @@ class LetterRecord:
     sha256: str
     baixado_em: str
     status_leitura: str = "pendente"
+    titulo: str | None = None

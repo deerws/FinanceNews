@@ -10,8 +10,13 @@ wheels/
 .venv
 
 # Dados baixados: PDFs de terceiros (direitos autorais) + índice gerado
-cartas/
+# (barra na frente: só a pasta na raiz, não web/app/(app)/cartas/ do Next.js)
+/cartas/
 
 # Estado local do Claude Code (não é conteúdo do projeto)
 .claude/
+
+# Segredos (service_role key do Supabase etc.) — nunca commitar
+.env
+.env.local
 

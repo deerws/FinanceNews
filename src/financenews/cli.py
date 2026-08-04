@@ -92,6 +92,7 @@ def crawl(
                         arquivo_txt=str(txt.relative_to(DEFAULT_ROOT.parent)),
                         sha256=sha256_of(content),
                         baixado_em=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+                        titulo=cand.titulo,
                     )
                     index.add(record)
                     novos += 1
@@ -129,6 +130,18 @@ def status() -> None:
     typer.echo("\nCartas mais recentes (por período de referência, não data de download):")
     for letter in recentes:
         typer.echo(f"  {letter.ano}-{letter.mes:02d}  {letter.gestora} (tier {letter.tier})")
+
+
+@app.command()
+def ingest() -> None:
+    """Sincroniza gestoras + cartas com o Supabase (idempotente, upsert por id)."""
+    from dotenv import load_dotenv
+
+    from .ingest import ingest as run_ingest
+
+    load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+    n_gestoras, n_cartas = run_ingest()
+    typer.echo(f"Sincronizado: {n_gestoras} gestoras, {n_cartas} cartas.")
 
 
 def main() -> None:
