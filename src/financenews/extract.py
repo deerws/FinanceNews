@@ -16,12 +16,63 @@ def extract_text(raw_path: Path, html_content: str | None = None) -> str:
 
 
 def _extract_pdf(path: Path) -> str:
-    parts: list[str] = []
+    # x_tolerance mais baixo que o padrão (3): o padrão junta palavras curtas
+    # (a, de, na...) com a palavra seguinte quando o espaçamento do PDF é
+    # apertado (comum em texto justificado) — ex.: "a taxa" virava "ataxa".
+    # layout=True preserva a posição espacial original, o que inclui as
+    # linhas em branco que separam parágrafos de verdade (sem isso, toda
+    # quebra de linha do PDF — inclusive quebra no meio de uma frase por
+    # causa da largura da página — vira \n, e não dá pra distinguir quebra
+    # de parágrafo de quebra de linha).
+    output: list[str] = []
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
-            text = page.extract_text() or ""
-            parts.append(text)
-    return "\n\n".join(parts).strip()
+            raw = page.extract_text(x_tolerance=1.5, layout=True) or ""
+            paragraphs = _paragraphs_from_layout_text(raw)
+            bold_lines = _bold_line_texts(page)
+            for para in paragraphs:
+                output.append(f"## {para}" if para in bold_lines else para)
+    return "\n\n".join(output).strip()
+
+
+def _paragraphs_from_layout_text(raw: str) -> list[str]:
+    paragraphs: list[str] = []
+    buffer: list[str] = []
+    for line in raw.split("\n"):
+        stripped = line.strip()
+        if stripped:
+            buffer.append(stripped)
+        elif buffer:
+            paragraphs.append(" ".join(buffer))
+            buffer = []
+    if buffer:
+        paragraphs.append(" ".join(buffer))
+    return paragraphs
+
+
+def _bold_line_texts(page: pdfplumber.page.Page) -> set[str]:
+    # Agrupa palavras por linha (posição vertical) e marca como "título" só
+    # as linhas 100% em negrito na fonte original — sinal confiável de
+    # seção (ex.: "Cenário"), não um chute por tamanho/pontuação da frase.
+    try:
+        words = page.extract_words(x_tolerance=1.5, extra_attrs=["fontname"])
+    except Exception:  # noqa: BLE001 - detecção de título é best-effort
+        return set()
+
+    lines: dict[int, list[dict]] = {}
+    for w in words:
+        key = round(w["top"] / 3)
+        lines.setdefault(key, []).append(w)
+
+    bold_texts: set[str] = set()
+    for line_words in lines.values():
+        if not line_words or not all("bold" in w["fontname"].lower() for w in line_words):
+            continue
+        line_words.sort(key=lambda w: w["x0"])
+        text = " ".join(w["text"] for w in line_words).strip()
+        if text:
+            bold_texts.add(text)
+    return bold_texts
 
 
 def _extract_html(html: str) -> str:
