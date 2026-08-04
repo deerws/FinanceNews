@@ -51,6 +51,6 @@ export const config = {
   // auth. Sem isso o navegador/SO não consegue buscar o manifest.webmanifest
   // nem os ícones pra sequer mostrar o prompt de instalação.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|[^?]*\\.(?:png|jpg|jpeg|svg|webp|ico|webmanifest)).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|[^?]*\\.(?:png|jpg|jpeg|svg|webp|ico|webmanifest|js)).*)",
   ],
 };
