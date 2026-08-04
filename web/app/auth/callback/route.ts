@@ -16,14 +16,17 @@ export async function GET(request: Request) {
   const next = searchParams.get("next") ?? "/";
 
   const supabase = await createClient();
+  let motivo = "sem_code_ou_token";
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return NextResponse.redirect(`${origin}${next}`);
+    motivo = error.code ?? error.message;
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) return NextResponse.redirect(`${origin}${next}`);
+    motivo = error.code ?? error.message;
   }
 
-  return NextResponse.redirect(`${origin}/login`);
+  return NextResponse.redirect(`${origin}/login?erro=${encodeURIComponent(motivo)}`);
 }

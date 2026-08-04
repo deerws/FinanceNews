@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+
+const ERRO_LABEL: Record<string, string> = {
+  otp_expired: "O link expirou (magic links valem por um tempo limitado). Peça um novo.",
+  access_denied: "Acesso negado — esse e-mail pode não estar na lista liberada.",
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -10,6 +15,16 @@ export default function LoginPage() {
     "idle",
   );
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const codigo = params.get("erro");
+    if (codigo) {
+      setStatus("error");
+      setErro(ERRO_LABEL[codigo] ?? `Falha no login (${codigo}). Peça um novo link.`);
+      window.history.replaceState({}, "", "/login");
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
