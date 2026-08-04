@@ -34,7 +34,7 @@ export function CartaCard({ carta }: { carta: CartaListItem }) {
   return (
     <Link
       href={`/cartas/${carta.id}`}
-      className="group flex flex-col gap-1 py-4 transition-colors first:pt-0"
+      className="group flex flex-col gap-1 border-b py-4 transition-colors lg:py-5"
     >
       <div className="flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
         <span>{TRILHA_LABEL[carta.trilha] ?? carta.trilha}</span>

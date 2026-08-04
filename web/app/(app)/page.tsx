@@ -16,6 +16,7 @@ export default async function HomePage({
     typeof params.gestoras === "string" ? params.gestoras.split(",").filter(Boolean) : [];
   const de = typeof params.de === "string" ? params.de : undefined;
   const ate = typeof params.ate === "string" ? params.ate : undefined;
+  const q = typeof params.q === "string" ? params.q : undefined;
   const limit = typeof params.limit === "string" ? Number(params.limit) : PAGE_SIZE;
 
   const supabase = await createClient();
@@ -35,6 +36,7 @@ export default async function HomePage({
   }
   if (de) cartasQuery = cartasQuery.gte("data_referencia", de);
   if (ate) cartasQuery = cartasQuery.lte("data_referencia", ate);
+  if (q) cartasQuery = cartasQuery.textSearch("busca", q, { type: "websearch", config: "portuguese" });
 
   const [{ data: gestorasComCartas }, { data: cartas, error }] = await Promise.all([
     gestorasQuery,
@@ -49,7 +51,7 @@ export default async function HomePage({
     .map((g) => ({ id: g.id, nome: g.nome }));
 
   return (
-    <div className="mx-auto max-w-2xl p-4">
+    <div className="mx-auto max-w-5xl p-4 lg:p-8">
       <div className="border-b pb-4">
         <FiltrosBar gestoras={gestoras} />
       </div>
@@ -60,7 +62,7 @@ export default async function HomePage({
         </p>
       )}
 
-      <div className="divide-y">
+      <div className="lg:grid lg:grid-cols-2 lg:gap-x-12">
         {(cartas as unknown as CartaListItem[] | null)?.map((carta) => (
           <CartaCard key={carta.id} carta={carta} />
         ))}

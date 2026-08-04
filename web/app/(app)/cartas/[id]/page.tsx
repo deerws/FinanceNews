@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ReadingControls } from "./reading-controls";
 import { ConteudoTexto } from "./conteudo-texto";
 import { MarcarLidoButton } from "./marcar-lido-button";
+import { CompartilharMenu } from "./compartilhar-menu";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -29,6 +30,28 @@ function extrairSecoes(texto: string): string[] {
     .map((b) => b.slice(3).trim());
 }
 
+function Sumario({ secoes, className = "" }: { secoes: string[]; className?: string }) {
+  return (
+    <nav className={`border border-border bg-muted/40 p-4 ${className}`}>
+      <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
+        Sumário
+      </p>
+      <ol className="space-y-1.5">
+        {secoes.map((secao, i) => (
+          <li key={i}>
+            <a
+              href={`#secao-${i}`}
+              className="font-serif text-sm underline decoration-border underline-offset-2 hover:decoration-foreground"
+            >
+              {secao}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 export default async function CartaPage({
   params,
 }: {
@@ -40,7 +63,7 @@ export default async function CartaPage({
   const { data: carta } = await supabase
     .from("cartas")
     .select(
-      "id, titulo, data_referencia, trilha, url_origem, conteudo_txt, gestoras(nome), leituras(status)",
+      "id, titulo, data_referencia, trilha, url_origem, conteudo_txt, n_paginas, gestoras(nome), leituras(status)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -51,9 +74,10 @@ export default async function CartaPage({
   const gestoraNome = Array.isArray(gestoraRel) ? gestoraRel[0]?.nome : gestoraRel?.nome;
   const lido = carta.leituras?.[0]?.status === "lido";
   const secoes = extrairSecoes(carta.conteudo_txt);
+  const temSumario = secoes.length > 1;
 
   return (
-    <div className="mx-auto max-w-2xl p-4">
+    <div className="mx-auto max-w-5xl p-4 lg:p-8">
       <div className="mb-4 flex items-center justify-between">
         <Button variant="ghost" size="sm" render={<Link href="/">
           <ArrowLeft /> Voltar
@@ -61,54 +85,53 @@ export default async function CartaPage({
         <ReadingControls />
       </div>
 
-      <div className="mb-6 space-y-3">
-        <div className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
-          {TRILHA_LABEL[carta.trilha] ?? carta.trilha}
-        </div>
-        <h1 className="font-serif text-3xl font-bold leading-tight text-balance">
-          {carta.titulo}
-        </h1>
-        <p className="font-serif text-base italic text-muted-foreground">
-          {gestoraNome} · {formatarData(carta.data_referencia)}
-        </p>
+      <div className="lg:flex lg:items-start lg:gap-10">
+        {temSumario && (
+          <aside className="hidden lg:block lg:w-56 lg:shrink-0">
+            <Sumario secoes={secoes} className="sticky top-8" />
+          </aside>
+        )}
 
-        <div className="flex flex-wrap items-center gap-2 pt-2">
-          <MarcarLidoButton cartaId={carta.id} lidoInicial={lido} />
-          <Button
-            variant="outline"
-            size="sm"
-            render={
-              <a href={carta.url_origem} target="_blank" rel="noopener noreferrer">
-                <ExternalLink /> Ver original
-              </a>
-            }
-          />
+        <div className="max-w-2xl">
+          <div className="mb-6 space-y-3">
+            <div className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
+              {TRILHA_LABEL[carta.trilha] ?? carta.trilha}
+            </div>
+            <h1 className="font-serif text-3xl font-bold leading-tight text-balance">
+              {carta.titulo}
+            </h1>
+            <p className="font-serif text-base italic text-muted-foreground">
+              {gestoraNome} · {formatarData(carta.data_referencia)}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <MarcarLidoButton cartaId={carta.id} lidoInicial={lido} />
+              <Button
+                variant="outline"
+                size="sm"
+                render={
+                  <a href={carta.url_origem} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink /> Ver original
+                  </a>
+                }
+              />
+              <CompartilharMenu
+                cartaId={carta.id}
+                titulo={carta.titulo ?? "Carta"}
+                gestoraNome={gestoraNome ?? ""}
+                urlOrigem={carta.url_origem}
+                nPaginas={carta.n_paginas}
+              />
+            </div>
+          </div>
+
+          <hr className="mb-6 border-t-2 border-foreground" />
+
+          {temSumario && <Sumario secoes={secoes} className="mb-8 lg:hidden" />}
+
+          <ConteudoTexto texto={carta.conteudo_txt} />
         </div>
       </div>
-
-      <hr className="mb-6 border-t-2 border-foreground" />
-
-      {secoes.length > 1 && (
-        <nav className="mb-8 border border-border bg-muted/40 p-4">
-          <p className="mb-2 text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
-            Sumário
-          </p>
-          <ol className="space-y-1.5">
-            {secoes.map((secao, i) => (
-              <li key={i}>
-                <a
-                  href={`#secao-${i}`}
-                  className="font-serif text-sm underline decoration-border underline-offset-2 hover:decoration-foreground"
-                >
-                  {secao}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
-
-      <ConteudoTexto texto={carta.conteudo_txt} />
     </div>
   );
 }
