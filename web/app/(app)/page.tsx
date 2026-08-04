@@ -49,16 +49,18 @@ export default async function HomePage({
     .map((g) => ({ id: g.id, nome: g.nome }));
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 p-4">
-      <FiltrosBar gestoras={gestoras} />
+    <div className="mx-auto max-w-2xl p-4">
+      <div className="border-b pb-4">
+        <FiltrosBar gestoras={gestoras} />
+      </div>
 
       {error && (
-        <p className="text-sm text-destructive">
+        <p className="pt-4 text-sm text-destructive">
           Erro carregando cartas: {error.message}
         </p>
       )}
 
-      <div className="space-y-2">
+      <div className="divide-y">
         {(cartas as unknown as CartaListItem[] | null)?.map((carta) => (
           <CartaCard key={carta.id} carta={carta} />
         ))}
@@ -72,7 +74,7 @@ export default async function HomePage({
       {cartas && cartas.length >= limit && (
         <a
           href={`?${new URLSearchParams({ ...(params as Record<string, string>), limit: String(limit + PAGE_SIZE) }).toString()}`}
-          className="block text-center text-sm text-muted-foreground underline"
+          className="block py-4 text-center text-sm text-muted-foreground underline"
         >
           Carregar mais
         </a>

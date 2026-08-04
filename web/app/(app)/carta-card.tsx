@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -35,15 +34,24 @@ export function CartaCard({ carta }: { carta: CartaListItem }) {
   return (
     <Link
       href={`/cartas/${carta.id}`}
-      className="flex flex-col gap-1 rounded-lg border p-4 transition-colors hover:bg-accent"
+      className="group flex flex-col gap-1 py-4 transition-colors first:pt-0"
     >
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Badge variant="secondary">{TRILHA_LABEL[carta.trilha] ?? carta.trilha}</Badge>
-        <span>{formatarData(carta.data_referencia)}</span>
-        {lido && <span className="text-green-600 dark:text-green-500">lido</span>}
+      <div className="flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
+        <span>{TRILHA_LABEL[carta.trilha] ?? carta.trilha}</span>
+        <span className="text-border">/</span>
+        <span className="font-sans font-normal normal-case tracking-normal text-muted-foreground">
+          {formatarData(carta.data_referencia)}
+        </span>
+        {lido && (
+          <span className="font-sans font-normal normal-case tracking-normal text-muted-foreground">
+            · lido
+          </span>
+        )}
       </div>
-      <p className="font-medium leading-snug">{carta.titulo}</p>
-      <p className="text-sm text-muted-foreground">{nomeGestora(carta)}</p>
+      <p className="font-serif text-xl font-semibold leading-snug group-hover:underline">
+        {carta.titulo}
+      </p>
+      <p className="font-sans text-sm text-muted-foreground">{nomeGestora(carta)}</p>
     </Link>
   );
 }

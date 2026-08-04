@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { ReadingControls } from "./reading-controls";
@@ -52,13 +51,16 @@ export default async function CartaPage({
         <ReadingControls />
       </div>
 
-      <div className="mb-4 space-y-2">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="secondary">{TRILHA_LABEL[carta.trilha] ?? carta.trilha}</Badge>
-          <span>{formatarData(carta.data_referencia)}</span>
+      <div className="mb-6 space-y-3">
+        <div className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
+          {TRILHA_LABEL[carta.trilha] ?? carta.trilha}
         </div>
-        <h1 className="text-2xl font-semibold leading-tight">{carta.titulo}</h1>
-        <p className="text-muted-foreground">{gestoraNome}</p>
+        <h1 className="font-serif text-3xl font-bold leading-tight text-balance">
+          {carta.titulo}
+        </h1>
+        <p className="font-serif text-base italic text-muted-foreground">
+          {gestoraNome} · {formatarData(carta.data_referencia)}
+        </p>
 
         <div className="flex flex-wrap items-center gap-2 pt-2">
           <MarcarLidoButton cartaId={carta.id} lidoInicial={lido} />
@@ -74,7 +76,7 @@ export default async function CartaPage({
         </div>
       </div>
 
-      <hr className="mb-4" />
+      <hr className="mb-6 border-t-2 border-foreground" />
 
       <ConteudoTexto texto={carta.conteudo_txt} />
     </div>
