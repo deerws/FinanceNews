@@ -9,6 +9,7 @@ import { ConteudoTexto } from "./conteudo-texto";
 import { MarcarLidoButton } from "./marcar-lido-button";
 import { CompartilharMenu } from "./compartilhar-menu";
 import { MudancaPainel } from "./mudanca-painel";
+import { AudioPlayer } from "./audio-player";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -143,6 +144,7 @@ export default async function CartaPage({
                 urlOrigem={carta.url_origem}
                 nPaginas={carta.n_paginas}
               />
+              <AudioPlayer cartaId={carta.id} />
             </div>
           </div>
 
