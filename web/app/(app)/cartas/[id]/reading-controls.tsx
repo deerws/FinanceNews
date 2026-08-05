@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Moon, Sun, Minus, Plus } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const TAMANHOS = ["sm", "base", "lg", "xl"] as const;
@@ -34,22 +34,13 @@ export function tamanhoClass(tamanho: Tamanho): string {
 }
 
 export function ReadingControls() {
-  const [escuro, setEscuro] = useState(false);
   const [tamanhoIdx, setTamanhoIdx] = useState(1);
 
   useEffect(() => {
-    setEscuro(document.documentElement.classList.contains("dark"));
     const salvo = localStorage.getItem("leitura-tamanho") as Tamanho | null;
     const idx = salvo ? TAMANHOS.indexOf(salvo) : 1;
     setTamanhoIdx(idx >= 0 ? idx : 1);
   }, []);
-
-  function alternarEscuro() {
-    const novo = !escuro;
-    setEscuro(novo);
-    document.documentElement.classList.toggle("dark", novo);
-    localStorage.setItem("leitura-tema", novo ? "dark" : "light");
-  }
 
   function mudarTamanho(delta: number) {
     const novoIdx = Math.min(TAMANHOS.length - 1, Math.max(0, tamanhoIdx + delta));
@@ -77,9 +68,6 @@ export function ReadingControls() {
         aria-label="Aumentar fonte"
       >
         <Plus />
-      </Button>
-      <Button variant="ghost" size="icon-sm" onClick={alternarEscuro} aria-label="Alternar modo escuro">
-        {escuro ? <Sun /> : <Moon />}
       </Button>
     </div>
   );

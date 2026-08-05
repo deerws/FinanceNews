@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellOff } from "lucide-react";
+import { Bell, BellOff, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   salvarPushSubscription,
   removerPushSubscription,
   alternarNotificacaoGestora,
+  atualizarEmailAtivo,
 } from "@/lib/actions";
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -24,14 +25,17 @@ export type GestoraOption = { id: string; nome: string };
 export function NotificacoesForm({
   gestoras,
   ativasIniciais,
+  emailAtivoInicial,
 }: {
   gestoras: GestoraOption[];
   ativasIniciais: string[];
+  emailAtivoInicial: boolean;
 }) {
   const [suportado, setSuportado] = useState(true);
   const [inscrito, setInscrito] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [ativas, setAtivas] = useState<Set<string>>(new Set(ativasIniciais));
+  const [emailAtivo, setEmailAtivo] = useState(emailAtivoInicial);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,35 +99,53 @@ export function NotificacoesForm({
     await alternarNotificacaoGestora(id, novoAtivo);
   }
 
-  if (!suportado) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Seu navegador não suporta notificações push. No Android, use o Chrome
-        (de preferência já instalado como app).
-      </p>
-    );
+  async function toggleEmail() {
+    const novo = !emailAtivo;
+    setEmailAtivo(novo);
+    await atualizarEmailAtivo(novo);
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 border p-4">
-        <div>
-          <p className="font-medium">Notificações no aparelho</p>
-          <p className="text-sm text-muted-foreground">
-            {inscrito ? "Ativadas neste navegador." : "Desativadas."}
-          </p>
+      {suportado ? (
+        <div className="flex items-center justify-between gap-3 border p-4">
+          <div>
+            <p className="font-medium">Notificações no aparelho</p>
+            <p className="text-sm text-muted-foreground">
+              {inscrito ? "Ativadas neste navegador." : "Desativadas."}
+            </p>
+          </div>
+          <Button
+            variant={inscrito ? "secondary" : "default"}
+            size="sm"
+            disabled={carregando}
+            onClick={inscrito ? desativar : ativar}
+          >
+            {inscrito ? <BellOff /> : <Bell />}
+            {inscrito ? "Desativar" : "Ativar"}
+          </Button>
         </div>
-        <Button
-          variant={inscrito ? "secondary" : "default"}
-          size="sm"
-          disabled={carregando}
-          onClick={inscrito ? desativar : ativar}
-        >
-          {inscrito ? <BellOff /> : <Bell />}
-          {inscrito ? "Desativar" : "Ativar"}
-        </Button>
-      </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Seu navegador não suporta notificações push. No Android, use o Chrome
+          (de preferência já instalado como app).
+        </p>
+      )}
       {erro && <p className="text-sm text-destructive">{erro}</p>}
+
+      <label className="flex items-center justify-between gap-3 border p-4">
+        <span className="flex items-center gap-2">
+          <Mail className="size-4 shrink-0 text-muted-foreground" />
+          <span>
+            <p className="font-medium">Também avisar por e-mail</p>
+            <p className="text-sm text-muted-foreground">
+              Manda um e-mail pras mesmas gestoras marcadas abaixo, além do
+              push (ou no lugar dele, se o push estiver desativado).
+            </p>
+          </span>
+        </span>
+        <Checkbox checked={emailAtivo} onCheckedChange={toggleEmail} />
+      </label>
 
       <div>
         <p className="mb-3 text-[0.7rem] font-semibold uppercase tracking-widest text-primary">
@@ -135,15 +157,15 @@ export function NotificacoesForm({
               <Checkbox
                 checked={ativas.has(g.id)}
                 onCheckedChange={() => toggleGestora(g.id)}
-                disabled={!inscrito}
+                disabled={!inscrito && !emailAtivo}
               />
               {g.nome}
             </label>
           ))}
         </div>
-        {!inscrito && (
+        {!inscrito && !emailAtivo && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Ative as notificações acima primeiro.
+            Ative as notificações no aparelho ou por e-mail primeiro.
           </p>
         )}
       </div>

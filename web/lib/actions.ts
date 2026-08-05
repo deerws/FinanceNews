@@ -59,6 +59,19 @@ export async function removerPushSubscription(endpoint: string) {
   if (error) throw new Error(error.message);
 }
 
+export async function atualizarEmailAtivo(ativo: boolean) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Não autenticado");
+
+  const { error } = await supabase
+    .from("preferencias_notificacao")
+    .upsert({ user_id: user.id, email_ativo: ativo }, { onConflict: "user_id" });
+  if (error) throw new Error(error.message);
+}
+
 export async function alternarNotificacaoGestora(gestoraId: string, ativar: boolean) {
   const supabase = await createClient();
   const {

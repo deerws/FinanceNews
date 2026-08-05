@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default async function AppLayout({
   children,
@@ -21,14 +22,24 @@ export default async function AppLayout({
           <span className="font-serif text-3xl font-semibold tracking-tight">
             FinanceNews
           </span>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground sm:gap-3">
             <span className="hidden sm:inline">{user?.email}</span>
+            <ThemeToggle />
             <Button
               variant="ghost"
               size="icon-sm"
               render={
-                <Link href="/configuracoes" aria-label="Notificações">
+                <Link href="/notificacoes" aria-label="Notificações">
                   <Bell />
+                </Link>
+              }
+            />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              render={
+                <Link href="/configuracoes" aria-label="Configurações">
+                  <Settings />
                 </Link>
               }
             />
