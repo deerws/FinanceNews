@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -32,6 +32,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
   const [ate, setAte] = useState(searchParams.get("ate") ?? "");
   const [busca, setBusca] = useState(searchParams.get("q") ?? "");
   const [naoLidos, setNaoLidos] = useState(searchParams.get("naoLidos") === "1");
+  const [semantica, setSemantica] = useState(searchParams.get("modo") === "semantica");
 
   function aplicar(next: {
     gestoras?: Set<string>;
@@ -40,6 +41,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     ate?: string;
     q?: string;
     naoLidos?: boolean;
+    semantica?: boolean;
   }) {
     const g = next.gestoras ?? selecionadas;
     const t = next.trilha ?? trilhasSel;
@@ -47,6 +49,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     const a = next.ate ?? ate;
     const q = next.q ?? busca;
     const nl = next.naoLidos ?? naoLidos;
+    const sem = next.semantica ?? semantica;
 
     const params = new URLSearchParams();
     if (g.size > 0) params.set("gestoras", Array.from(g).join(","));
@@ -55,6 +58,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     if (a) params.set("ate", a);
     if (q) params.set("q", q);
     if (nl) params.set("naoLidos", "1");
+    if (sem && q) params.set("modo", "semantica");
 
     router.push(params.size > 0 ? `/?${params.toString()}` : "/");
   }
@@ -81,35 +85,56 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     aplicar({ naoLidos: next });
   }
 
-  const temFiltro = selecionadas.size > 0 || trilhasSel.size > 0 || de || ate || busca || naoLidos;
+  const temFiltro =
+    selecionadas.size > 0 || trilhasSel.size > 0 || de || ate || busca || naoLidos || semantica;
 
   return (
     <div className="space-y-2">
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") aplicar({ q: busca });
-          }}
-          placeholder="Buscar por palavra ou trecho..."
-          className="w-full rounded-md border border-input bg-transparent py-2 pr-8 pl-8 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-        {busca && (
-          <button
-            type="button"
-            onClick={() => {
-              setBusca("");
-              aplicar({ q: "" });
+      <div className="flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") aplicar({ q: busca });
             }}
-            aria-label="Limpar busca"
-            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
-        )}
+            placeholder={semantica ? "Descreva o que você procura..." : "Buscar por palavra ou trecho..."}
+            className="w-full rounded-md border border-input bg-transparent py-2 pr-8 pl-8 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => {
+                setBusca("");
+                aplicar({ q: "" });
+              }}
+              aria-label="Limpar busca"
+              className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !semantica;
+            setSemantica(next);
+            if (busca) aplicar({ semantica: next });
+          }}
+          title="Busca por significado (IA), não só palavra exata"
+          aria-pressed={semantica}
+          className={`flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-2 text-xs font-medium transition-colors ${
+            semantica
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-input text-muted-foreground hover:border-foreground hover:text-foreground"
+          }`}
+        >
+          <Sparkles className="size-3.5" />
+          IA
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -197,6 +222,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
               setAte("");
               setBusca("");
               setNaoLidos(false);
+              setSemantica(false);
               router.push("/");
             }}
           >

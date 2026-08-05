@@ -9,6 +9,7 @@ import pdfplumber
 from supabase import Client, create_client
 
 from .dates import MESES_COMPLETO
+from .embeddings import chunk_carta, embed_passages
 from .index_store import IndexStore
 from .notify import notificar_cartas_novas
 from .registry import load_sources
@@ -38,14 +39,14 @@ def _client() -> Client:
     return create_client(url, key)
 
 
-def _upsert_in_batches(client: Client, table: str, rows: list[dict]) -> None:
-    # upsert é idempotente por natureza (on_conflict=id) — seguro tentar de
+def _upsert_in_batches(client: Client, table: str, rows: list[dict], on_conflict: str = "id") -> None:
+    # upsert é idempotente por natureza (on_conflict) — seguro tentar de
     # novo em caso de timeout de rede transitório, comum rodando via cron.
     for i in range(0, len(rows), _BATCH):
         batch = rows[i : i + _BATCH]
         for tentativa in range(1, _MAX_TENTATIVAS + 1):
             try:
-                client.table(table).upsert(batch, on_conflict="id").execute()
+                client.table(table).upsert(batch, on_conflict=on_conflict).execute()
                 break
             except httpx.TimeoutException:
                 if tentativa == _MAX_TENTATIVAS:
@@ -53,11 +54,45 @@ def _upsert_in_batches(client: Client, table: str, rows: list[dict]) -> None:
                 time.sleep(2 * tentativa)
 
 
-def ingest() -> tuple[int, int, int]:
-    """Sincroniza gestoras + cartas com o Supabase. Idempotente (upsert por id).
-    Notifica por push quem segue a gestora de cada carta genuinamente nova.
+def _embed_cartas_pendentes(client: Client, cartas_payload: list[dict]) -> int:
+    """Gera embeddings só pras cartas que ainda não têm chunk nenhum —
+    cobre tanto carta genuinamente nova quanto backfill de cartas antigas
+    que existiam antes dessa feature. Não reprocessa em re-ingest normal
+    (custo de embedding só é pago uma vez por carta).
+    """
+    ids = [c["id"] for c in cartas_payload if c["conteudo_txt"]]
+    ja_tem_chunks: set[str] = set()
+    for i in range(0, len(ids), _BATCH):
+        lote = ids[i : i + _BATCH]
+        rows = client.table("chunks").select("carta_id").in_("carta_id", lote).execute().data
+        ja_tem_chunks.update(r["carta_id"] for r in rows)
 
-    Retorna (n_gestoras, n_cartas, n_notificacoes) enviadas.
+    pendentes = [c for c in cartas_payload if c["id"] not in ja_tem_chunks and c["conteudo_txt"]]
+    if not pendentes:
+        return 0
+
+    tarefas: list[tuple[str, int, str | None, str]] = []
+    for c in pendentes:
+        for ordem, (secao, texto) in enumerate(chunk_carta(c["conteudo_txt"])):
+            tarefas.append((c["id"], ordem, secao, texto))
+    if not tarefas:
+        return 0
+
+    vetores = embed_passages([t[3] for t in tarefas])
+    chunks_payload = [
+        {"carta_id": carta_id, "ordem": ordem, "secao": secao, "texto": texto, "embedding": vetor}
+        for (carta_id, ordem, secao, texto), vetor in zip(tarefas, vetores)
+    ]
+    _upsert_in_batches(client, "chunks", chunks_payload, on_conflict="carta_id,ordem")
+    return len({t[0] for t in tarefas})
+
+
+def ingest() -> tuple[int, int, int, int]:
+    """Sincroniza gestoras + cartas com o Supabase. Idempotente (upsert por id).
+    Notifica por push/e-mail quem segue a gestora de cada carta genuinamente
+    nova, e gera embeddings (busca semântica) pra cartas que ainda não têm.
+
+    Retorna (n_gestoras, n_cartas, n_notificacoes, n_cartas_indexadas).
     """
     client = _client()
     sources = load_sources()
@@ -118,5 +153,6 @@ def ingest() -> tuple[int, int, int]:
         if c["id"] not in ids_existentes
     ]
     n_notificacoes = notificar_cartas_novas(client, novas)
+    n_indexadas = _embed_cartas_pendentes(client, cartas_payload)
 
-    return len(gestoras_payload), len(cartas_payload), n_notificacoes
+    return len(gestoras_payload), len(cartas_payload), n_notificacoes, n_indexadas

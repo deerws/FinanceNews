@@ -13,7 +13,9 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "pywebpush>=2.3.0",
     "pyyaml>=6.0.3",
+    "sentence-transformers>=5.6.1",
     "supabase>=2.31.0",
+    "torch>=2.13.0",
     "typer>=0.27.0",
 ]
 
@@ -23,3 +25,13 @@ financenews = "financenews:main"
 [build-system]
 requires = ["uv_build>=0.11.9,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+# CPU-only wheels — o build padrão do PyPI puxa pacotes CUDA inteiros (~5GB)
+# desnecessários pra um cron job sem GPU.
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

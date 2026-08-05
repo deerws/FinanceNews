@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@huggingface/transformers": "^4.2.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
     "class-variance-authority": "^0.7.1",
@@ -41,6 +42,8 @@
     "unrs-resolver"
   ],
   "trustedDependencies": [
+    "onnxruntime-node",
+    "protobufjs",
     "sharp",
     "unrs-resolver"
   ]
