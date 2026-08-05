@@ -87,11 +87,16 @@ fontes:
     nome: IP Capital Partners
     tier: 1
     trilha: equity_br
-    cadencia: trimestral
-    url: TBD
-    verificado: false
+    cadencia: mensal
+    url: https://ip-capitalpartners.com/relatorios/
+    verificado: true
     coleta: scrape_index
-    implementado: false
+    implementado: true
+    notas: >
+      [2026-08-04] URL descoberta via busca (era TBD). Publica "Relatório
+      de Gestão" mensal (não trimestral como o registry original supunha),
+      padrão IP_RG_{AAAAMM}_{slug}.pdf. Confirmado ao vivo como carta de
+      verdade (18 páginas de comentário, não um factsheet).
 
   - id: brasil_capital
     nome: Brasil Capital
@@ -467,12 +472,18 @@ fontes:
     cadencia: anual
     janela: "último sábado de fevereiro"
     url: https://www.berkshirehathaway.com/letters/letters.html
-    verificado: false
+    verificado: true
     coleta: scrape_index
-    implementado: false
+    implementado: true
     notas: >
       A partir de 2026 escrita por Greg Abel (Buffett saiu do cargo de CEO
       no fim de 2025, segue como Chairman). Site em HTML antigo e estável.
+      [2026-08-04] Confirmado ao vivo: precisa do pacote `brotli` (site usa
+      Content-Encoding: br, sem ele httpx recebe bytes comprimidos como se
+      fossem texto). 2004-2024 têm PDF direto em /letters/{ano}ltr.pdf; anos
+      anteriores (1977-2003) só têm página HTML própria por ano — parte
+      redireciona pra um PDF de nome irregular (ex.: 2000pdf.pdf), parte é
+      o texto puro da carta. Ambos os casos tratados.
 
   - id: apollo_slok
     nome: Apollo — Torsten Slok (Daily Spark)
@@ -490,11 +501,17 @@ fontes:
     tier: 1
     trilha: global
     cadencia: semanal
-    url: TBD
-    verificado: false
-    coleta: rss
-    implementado: false
-    notas: "Gratuito, quant-value. Melhor relação sinal/ruído do bloco global."
+    url: https://verdadcap.com/weekly-research
+    verificado: true
+    coleta: scrape_index
+    implementado: true
+    notas: >
+      Gratuito, quant-value. Melhor relação sinal/ruído do bloco global.
+      [2026-08-04] URL descoberta via busca (era TBD). Não é RSS — é uma
+      página de arquivo Squarespace (/weekly-research) já ordenada mais
+      recente primeiro, com data ao lado de cada post. sitemap.xml existe
+      mas o <lastmod> reflete a última regeneração do sitemap inteiro, não
+      a data de publicação — inútil pra ordenar, por isso não foi usado.
 
   - id: gmo
     nome: GMO — Quarterly Letter

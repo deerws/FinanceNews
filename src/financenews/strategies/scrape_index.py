@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import re
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
@@ -264,6 +265,142 @@ def _discover_persevera(source: Source, fetcher: Fetcher, limit: int = 8) -> lis
     return candidates
 
 
+_BERKSHIRE_PDF_RE = re.compile(r"^(\d{4})ltr\.pdf$", re.IGNORECASE)
+_BERKSHIRE_HTML_YEAR_RE = re.compile(r"^(\d{4})\.html$", re.IGNORECASE)
+
+
+def _discover_berkshire(source: Source, fetcher: Fetcher) -> list[Candidate]:
+    # A carta de um ano fica em /letters/{ano}ltr.pdf desde 2004; anos
+    # anteriores (pré-web) só têm uma página HTML própria por ano, que às
+    # vezes só redireciona pra um PDF de nome irregular (ex.: 2000pdf.pdf)
+    # e às vezes é o próprio texto da carta (formatado em Word antigo).
+    # data_referencia usa mes=12 (a carta cobre o ano fiscal inteiro).
+    resp = fetcher.get(source.url)
+    if resp is None:
+        return []
+    soup = BeautifulSoup(resp.text, "lxml")
+    hrefs = [a["href"].strip() for a in soup.find_all("a", href=True)]
+    candidates: list[Candidate] = []
+    seen_years: set[int] = set()
+
+    for href in hrefs:
+        match = _BERKSHIRE_PDF_RE.match(href)
+        if match:
+            ano = int(match.group(1))
+            seen_years.add(ano)
+            candidates.append(
+                Candidate(source_id=source.id, url=urljoin(source.url, href), ano=ano, mes=12, content_type="pdf")
+            )
+
+    # A carta mais recente às vezes já está publicada mas ainda não linkada
+    # na página índice (confirmado ao vivo: 2025ltr.pdf existia antes do
+    # link aparecer em letters.html) — sonda os 2 anos mais recentes direto.
+    ano_atual = datetime.date.today().year
+    for ano in (ano_atual, ano_atual - 1):
+        if ano in seen_years:
+            continue
+        url = urljoin(source.url, f"{ano}ltr.pdf")
+        head = fetcher.head(url)
+        if head is not None and head.status_code == 200 and "pdf" in head.headers.get("content-type", "").lower():
+            seen_years.add(ano)
+            candidates.append(Candidate(source_id=source.id, url=url, ano=ano, mes=12, content_type="pdf"))
+
+    for href in hrefs:
+        match = _BERKSHIRE_HTML_YEAR_RE.match(href)
+        if not match:
+            continue
+        ano = int(match.group(1))
+        if ano in seen_years:
+            continue
+        page_url = urljoin(source.url, href)
+        page_resp = fetcher.get(page_url)
+        if page_resp is None:
+            continue
+        page_soup = BeautifulSoup(page_resp.text, "lxml")
+        pdf_link = next((a["href"] for a in page_soup.find_all("a", href=True) if a["href"].lower().endswith(".pdf")), None)
+        if pdf_link:
+            seen_years.add(ano)
+            candidates.append(
+                Candidate(source_id=source.id, url=urljoin(page_url, pdf_link), ano=ano, mes=12, content_type="pdf")
+            )
+            continue
+
+        for tag in page_soup(["script", "style"]):
+            tag.decompose()
+        if not page_soup.get_text().strip():
+            continue
+        seen_years.add(ano)
+        candidates.append(
+            Candidate(
+                source_id=source.id, url=page_url, ano=ano, mes=12, content_type="html",
+                titulo=f"Berkshire Hathaway — Carta aos Acionistas {ano}",
+                html_content=str(page_soup),
+            )
+        )
+    return candidates
+
+
+def _discover_verdad(source: Source, fetcher: Fetcher, limit: int = 12) -> list[Candidate]:
+    # /weekly-research é a própria página de arquivo (template Squarespace),
+    # já lista mais recente primeiro com data ao lado de cada item — não
+    # precisa do sitemap.xml (cujo <lastmod> reflete a última regeneração do
+    # sitemap inteiro, não a data de publicação de cada post, então é inútil
+    # pra ordenar por recência).
+    resp = fetcher.get(source.url)
+    if resp is None:
+        return []
+    soup = BeautifulSoup(resp.text, "lxml")
+    candidates = []
+    for li in soup.find_all("li", class_="archive-item"):
+        if len(candidates) >= limit:
+            break
+        a = li.find("a", class_="archive-item-link")
+        date_span = li.find("span", class_="archive-item-date-before") or li.find(
+            "span", class_="archive-item-date-after"
+        )
+        if a is None or date_span is None:
+            continue
+        try:
+            dt = datetime.datetime.strptime(date_span.get_text(strip=True), "%b %d, %Y")
+        except ValueError:
+            continue
+        href = urljoin(source.url, a.get("href", ""))
+        art_resp = fetcher.get(href)
+        if art_resp is None:
+            continue
+        art_soup = BeautifulSoup(art_resp.text, "lxml")
+        article = art_soup.find("article") or art_soup.find("main")
+        if article is None:
+            continue
+        candidates.append(
+            Candidate(
+                source_id=source.id, url=href, ano=dt.year, mes=dt.month, content_type="html",
+                titulo=a.get_text(strip=True), html_content=str(article),
+            )
+        )
+    return candidates
+
+
+_IP_CAPITAL_DATE_RE = re.compile(r"IP_RG_(\d{4})(\d{2})", re.IGNORECASE)
+
+
+def _discover_ip_capital(source: Source, fetcher: Fetcher) -> list[Candidate]:
+    # Nome do arquivo é IP_RG_{AAAAMM}_{slug}.pdf (RG = "Relatório de
+    # Gestão") — ano+mês concatenados sem separador, não casa com nenhum dos
+    # regex genéricos de _parse_period_from_filename/parse_date_from_url.
+    resp = fetcher.get(source.url)
+    if resp is None:
+        return []
+    candidates = []
+    for url in _pdf_links(resp.text, source.url):
+        match = _IP_CAPITAL_DATE_RE.search(url)
+        if not match:
+            continue
+        ano, mes = int(match.group(1)), int(match.group(2))
+        candidates.append(Candidate(source_id=source.id, url=url, ano=ano, mes=mes, content_type="pdf"))
+    return candidates
+
+
 _BY_ID = {
     "guepardo": _discover_guepardo,
     "dynamo": _discover_dynamo,
@@ -271,6 +408,9 @@ _BY_ID = {
     "versa": _discover_versa,
     "oaktree_marks": _discover_oaktree,
     "persevera": _discover_persevera,
+    "berkshire": _discover_berkshire,
+    "verdad": _discover_verdad,
+    "ip_capital": _discover_ip_capital,
 }
 
 
