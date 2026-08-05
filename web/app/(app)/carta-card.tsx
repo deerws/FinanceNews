@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LIMIAR_MUDANCA_SIGNIFICATIVA } from "@/lib/mudanca";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -14,12 +15,23 @@ export type CartaListItem = {
   trilha: string;
   gestoras: { nome: string } | { nome: string }[] | null;
   leituras: { status: string }[] | null;
+  // carta_id em `comparacoes` é chave primária (1:1), então o PostgREST
+  // embeda como objeto único, não array — diferente de `leituras`, cuja
+  // chave (user_id, carta_id) permite várias linhas por carta.
+  comparacoes: { similaridade: number | null } | { similaridade: number | null }[] | null;
 };
 
 function nomeGestora(carta: CartaListItem): string {
   const g = carta.gestoras;
   if (!g) return "";
   return Array.isArray(g) ? (g[0]?.nome ?? "") : g.nome;
+}
+
+function similaridadeMudanca(carta: CartaListItem): number | null {
+  const c = carta.comparacoes;
+  if (!c) return null;
+  const row = Array.isArray(c) ? c[0] : c;
+  return row?.similaridade ?? null;
 }
 
 function formatarData(dataRef: string): string {
@@ -30,6 +42,8 @@ function formatarData(dataRef: string): string {
 
 export function CartaCard({ carta }: { carta: CartaListItem }) {
   const lido = carta.leituras?.[0]?.status === "lido";
+  const similaridade = similaridadeMudanca(carta);
+  const mudou = similaridade != null && similaridade < LIMIAR_MUDANCA_SIGNIFICATIVA;
 
   return (
     <Link
@@ -45,6 +59,11 @@ export function CartaCard({ carta }: { carta: CartaListItem }) {
         {lido && (
           <span className="font-sans font-normal normal-case tracking-normal text-muted-foreground">
             · lido
+          </span>
+        )}
+        {mudou && (
+          <span className="font-sans font-normal normal-case tracking-normal text-amber-600 dark:text-amber-500">
+            · mudou desde a anterior
           </span>
         )}
       </div>

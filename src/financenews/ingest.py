@@ -11,6 +11,7 @@ from supabase import Client, create_client
 from .dates import MESES_COMPLETO
 from .embeddings import chunk_carta, embed_passages
 from .index_store import IndexStore
+from .mudancas import comparar_cartas
 from .notify import notificar_cartas_novas
 from .registry import load_sources
 from .storage import DEFAULT_ROOT
@@ -64,7 +65,20 @@ def _embed_cartas_pendentes(client: Client, cartas_payload: list[dict]) -> int:
     ja_tem_chunks: set[str] = set()
     for i in range(0, len(ids), _BATCH):
         lote = ids[i : i + _BATCH]
-        rows = client.table("chunks").select("carta_id").in_("carta_id", lote).execute().data
+        # filtra ordem=0 (todo carta com chunk tem exatamente 1 linha nesse
+        # ordem) pra nunca ter mais de 1 linha por carta_id — uma carta com
+        # dezenas de chunks (ex.: cartas anuais longas) podia estourar o
+        # limite padrão de 1000 linhas do PostgREST e sumir do resultado,
+        # fazendo re-embeddar carta que já tinha chunk (achado ao vivo no
+        # backfill: reprocessou 46 cartas que já estavam prontas).
+        rows = (
+            client.table("chunks")
+            .select("carta_id")
+            .in_("carta_id", lote)
+            .eq("ordem", 0)
+            .execute()
+            .data
+        )
         ja_tem_chunks.update(r["carta_id"] for r in rows)
 
     pendentes = [c for c in cartas_payload if c["id"] not in ja_tem_chunks and c["conteudo_txt"]]
@@ -87,12 +101,88 @@ def _embed_cartas_pendentes(client: Client, cartas_payload: list[dict]) -> int:
     return len({t[0] for t in tarefas})
 
 
-def ingest() -> tuple[int, int, int, int]:
+def _comparar_cartas_pendentes(client: Client, cartas_payload: list[dict]) -> int:
+    """Compara cada carta com a anterior da mesma gestora (por
+    data_referencia), reusando os embeddings já gerados em `chunks`. Só
+    processa cartas que ainda não têm linha em `comparacoes` — idempotente.
+    Carta sem antecessora comparável (primeira da gestora) ganha uma linha
+    com similaridade nula, só pra não reprocessar toda hora.
+    """
+    ids = [c["id"] for c in cartas_payload]
+    ja_comparadas: set[str] = set()
+    for i in range(0, len(ids), _BATCH):
+        lote = ids[i : i + _BATCH]
+        rows = client.table("comparacoes").select("carta_id").in_("carta_id", lote).execute().data
+        ja_comparadas.update(r["carta_id"] for r in rows)
+
+    pendentes = [c for c in cartas_payload if c["id"] not in ja_comparadas]
+    if not pendentes:
+        return 0
+
+    gestora_ids = list({c["gestora_id"] for c in pendentes})
+    letras_por_gestora: dict[str, list[dict]] = {}
+    for i in range(0, len(gestora_ids), _BATCH):
+        lote = gestora_ids[i : i + _BATCH]
+        rows = (
+            client.table("cartas")
+            .select("id, gestora_id, data_referencia")
+            .in_("gestora_id", lote)
+            .order("data_referencia")
+            .execute()
+            .data
+        )
+        for r in rows:
+            letras_por_gestora.setdefault(r["gestora_id"], []).append(r)
+
+    chunks_cache: dict[str, list[dict]] = {}
+
+    def chunks_de(carta_id: str) -> list[dict]:
+        if carta_id not in chunks_cache:
+            chunks_cache[carta_id] = (
+                client.table("chunks")
+                .select("secao, texto, embedding")
+                .eq("carta_id", carta_id)
+                .execute()
+                .data
+            )
+        return chunks_cache[carta_id]
+
+    comparacoes_payload = []
+    for carta in pendentes:
+        letras = letras_por_gestora.get(carta["gestora_id"], [])
+        anteriores = [
+            c
+            for c in letras
+            if c["data_referencia"] < carta["data_referencia"] and c["id"] != carta["id"]
+        ]
+        if not anteriores:
+            comparacoes_payload.append(
+                {"carta_id": carta["id"], "carta_anterior_id": None, "similaridade": None, "trechos_novos": None}
+            )
+            continue
+
+        anterior = anteriores[-1]
+        similaridade, trechos = comparar_cartas(chunks_de(carta["id"]), chunks_de(anterior["id"]))
+        comparacoes_payload.append(
+            {
+                "carta_id": carta["id"],
+                "carta_anterior_id": anterior["id"],
+                "similaridade": similaridade,
+                "trechos_novos": trechos or None,
+            }
+        )
+
+    _upsert_in_batches(client, "comparacoes", comparacoes_payload, on_conflict="carta_id")
+    return sum(1 for c in comparacoes_payload if c["similaridade"] is not None)
+
+
+def ingest() -> tuple[int, int, int, int, int]:
     """Sincroniza gestoras + cartas com o Supabase. Idempotente (upsert por id).
     Notifica por push/e-mail quem segue a gestora de cada carta genuinamente
-    nova, e gera embeddings (busca semântica) pra cartas que ainda não têm.
+    nova, gera embeddings (busca semântica) pra cartas que ainda não têm, e
+    compara cada carta com a anterior da mesma gestora (detector de mudança).
 
-    Retorna (n_gestoras, n_cartas, n_notificacoes, n_cartas_indexadas).
+    Retorna (n_gestoras, n_cartas, n_notificacoes, n_cartas_indexadas, n_cartas_comparadas).
     """
     client = _client()
     sources = load_sources()
@@ -154,5 +244,6 @@ def ingest() -> tuple[int, int, int, int]:
     ]
     n_notificacoes = notificar_cartas_novas(client, novas)
     n_indexadas = _embed_cartas_pendentes(client, cartas_payload)
+    n_comparadas = _comparar_cartas_pendentes(client, cartas_payload)
 
-    return len(gestoras_payload), len(cartas_payload), n_notificacoes, n_indexadas
+    return len(gestoras_payload), len(cartas_payload), n_notificacoes, n_indexadas, n_comparadas

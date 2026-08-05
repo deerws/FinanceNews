@@ -140,10 +140,11 @@ def ingest() -> None:
     from .ingest import ingest as run_ingest
 
     load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
-    n_gestoras, n_cartas, n_notificacoes, n_indexadas = run_ingest()
+    n_gestoras, n_cartas, n_notificacoes, n_indexadas, n_comparadas = run_ingest()
     typer.echo(
         f"Sincronizado: {n_gestoras} gestoras, {n_cartas} cartas, "
-        f"{n_notificacoes} notificações enviadas, {n_indexadas} cartas indexadas p/ busca semântica."
+        f"{n_notificacoes} notificações enviadas, {n_indexadas} cartas indexadas p/ busca semântica, "
+        f"{n_comparadas} comparadas com a carta anterior."
     )
 
 

@@ -39,7 +39,9 @@ export default async function HomePage({
 
   let cartasQuery = supabase
     .from("cartas")
-    .select("id, titulo, data_referencia, trilha, gestoras(nome), leituras(status)")
+    .select(
+      "id, titulo, data_referencia, trilha, gestoras(nome), leituras(status), comparacoes!carta_id(similaridade)",
+    )
     .order("data_referencia", { ascending: false })
     .limit(limit);
   if (gestorasSelecionadas.length > 0) {

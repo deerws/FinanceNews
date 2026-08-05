@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { LIMIAR_MUDANCA_SIGNIFICATIVA } from "@/lib/mudanca";
 import { ReadingControls } from "./reading-controls";
 import { ConteudoTexto } from "./conteudo-texto";
 import { MarcarLidoButton } from "./marcar-lido-button";
 import { CompartilharMenu } from "./compartilhar-menu";
+import { MudancaPainel } from "./mudanca-painel";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -60,13 +62,20 @@ export default async function CartaPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: carta } = await supabase
-    .from("cartas")
-    .select(
-      "id, titulo, data_referencia, trilha, url_origem, conteudo_txt, n_paginas, gestoras(nome), leituras(status)",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: carta }, { data: comparacao }] = await Promise.all([
+    supabase
+      .from("cartas")
+      .select(
+        "id, titulo, data_referencia, trilha, url_origem, conteudo_txt, n_paginas, gestoras(nome), leituras(status)",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("comparacoes")
+      .select("carta_anterior_id, similaridade, trechos_novos")
+      .eq("carta_id", id)
+      .maybeSingle(),
+  ]);
 
   if (!carta) notFound();
 
@@ -75,6 +84,18 @@ export default async function CartaPage({
   const lido = carta.leituras?.[0]?.status === "lido";
   const secoes = extrairSecoes(carta.conteudo_txt);
   const temSumario = secoes.length > 1;
+
+  const mudouSignificativamente =
+    comparacao?.carta_anterior_id != null &&
+    comparacao.similaridade != null &&
+    comparacao.similaridade < LIMIAR_MUDANCA_SIGNIFICATIVA;
+  const { data: cartaAnterior } = mudouSignificativamente
+    ? await supabase
+        .from("cartas")
+        .select("titulo, data_referencia, gestoras(nome)")
+        .eq("id", comparacao.carta_anterior_id!)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <div className="mx-auto max-w-5xl p-4 lg:p-8">
@@ -126,6 +147,16 @@ export default async function CartaPage({
           </div>
 
           <hr className="mb-6 border-t-2 border-foreground" />
+
+          {mudouSignificativamente && comparacao?.carta_anterior_id && (
+            <MudancaPainel
+              cartaAnteriorId={comparacao.carta_anterior_id}
+              cartaAnteriorTitulo={cartaAnterior?.titulo ?? "carta anterior"}
+              trechos={(comparacao.trechos_novos as
+                | { secao: string | null; texto: string; similaridade: number }[]
+                | null) ?? []}
+            />
+          )}
 
           {temSumario && <Sumario secoes={secoes} className="mb-8 lg:hidden" />}
 
