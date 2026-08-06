@@ -93,7 +93,13 @@ export async function gerarDeviceToken(nome: string): Promise<string> {
   });
   if (error) throw new Error(error.message);
 
-  refresh();
+  // Sem refresh() de propósito: o token cru só existe neste retorno, e o
+  // componente já atualiza a própria lista localmente (setTokens). Um
+  // refresh() aqui dispara um re-render da rota inteira alguns instantes
+  // depois de mostrar o token — se esse re-render tropeçar em qualquer
+  // coisa (rede, etc.), o error boundary do Next derruba a página inteira
+  // e o token já exibido some sem chance de copiar. Acontecido de verdade
+  // em produção — ver KINDLE.md.
   return token;
 }
 
@@ -105,7 +111,8 @@ export async function revogarDeviceToken(id: string) {
     .eq("id", id);
   if (error) throw new Error(error.message);
 
-  refresh();
+  // Mesmo motivo do gerarDeviceToken: o componente já remove o token da
+  // lista localmente, refresh() aqui só adiciona risco sem necessidade.
 }
 
 export async function alternarFilaKindle(cartaId: string, ativar: boolean) {
