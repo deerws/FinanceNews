@@ -18,12 +18,23 @@ arquitetura por trás — pra não precisar redescobrir isso daqui a 3 meses.
 1. No FinanceNews, abra **Configurações → Kindle**, dê um nome pro
    dispositivo (ex. "Kindle Paperwhite") e clique em **Gerar token**. O
    token só aparece **uma vez** — copie antes de sair da tela.
-2. No KOReader: abra o gerenciador de arquivos → ícone de catálogos OPDS →
-   adicionar catálogo novo.
-   - **URL**: `https://financenews-app.vercel.app/api/opds`
-   - **Usuário**: qualquer coisa (ex. seu email — não é validado, é só o
-     token que importa)
-   - **Senha**: o token que você copiou no passo 1
+2. No KOReader (não confundir com o botão de "selecionar arquivos"/"adicionar
+   pasta" do gerenciador de arquivos normal — isso é só pra armazenamento
+   local, catálogo OPDS fica em outro lugar):
+   - Na tela do gerenciador de arquivos (file browser), toque no topo da
+     tela pra abrir o menu superior.
+   - Toque no ícone de **lupa** (🔎 busca) na barra de ícones do topo.
+   - Selecione **OPDS catalog** (deve aparecer entre as opções de busca).
+   - Toque no ícone **+** (geralmente no canto superior) pra adicionar um
+     catálogo novo.
+   - Preencha:
+     - **Nome**: FinanceNews (ou o que quiser)
+     - **URL**: `https://financenews-app.vercel.app/api/opds`
+     - **Usuário**: qualquer coisa (ex. seu email — não é validado, é só o
+       token que importa)
+     - **Senha**: o token que você copiou no passo 1
+   - Salve. O catálogo "FinanceNews" deve aparecer na lista de catálogos
+     OPDS — toque nele pra navegar.
 3. Navegue até **Não lidas** ou **Fila de leitura**, baixe uma carta e
    confirme que abre.
 4. Pra sincronizar automaticamente: dentro do catálogo, use a opção **Sync
