@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
@@ -21,6 +22,7 @@ export default function LoginPage() {
   const [confirmacao, setConfirmacao] = useState("");
   const [status, setStatus] = useState<"idle" | "enviando" | "erro" | "cadastrado">("idle");
   const [erro, setErro] = useState<string | null>(null);
+  const [mostrarSenha, setMostrarSenha] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -116,18 +118,28 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
-          <input
-            type="password"
-            required
-            minLength={modo === "cadastrar" ? 8 : undefined}
-            placeholder={modo === "cadastrar" ? "senha (mín. 8 caracteres)" : "senha"}
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
+          <div className="relative">
+            <input
+              type={mostrarSenha ? "text" : "password"}
+              required
+              minLength={modo === "cadastrar" ? 8 : undefined}
+              placeholder={modo === "cadastrar" ? "senha (mín. 8 caracteres)" : "senha"}
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 pr-9 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <button
+              type="button"
+              onClick={() => setMostrarSenha((v) => !v)}
+              aria-label={mostrarSenha ? "Esconder senha" : "Mostrar senha"}
+              className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {mostrarSenha ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
           {modo === "cadastrar" && (
             <input
-              type="password"
+              type={mostrarSenha ? "text" : "password"}
               required
               placeholder="confirme a senha"
               value={confirmacao}

@@ -28,6 +28,7 @@ export default async function HomePage({
   const q = typeof params.q === "string" ? params.q : undefined;
   const modoSemantico = params.modo === "semantica" && !!q;
   const naoLidos = params.naoLidos === "1";
+  const favoritosSomente = params.favoritos === "1";
   const limit = typeof params.limit === "string" ? Number(params.limit) : PAGE_SIZE;
 
   const supabase = await createClient();
@@ -40,7 +41,7 @@ export default async function HomePage({
   let cartasQuery = supabase
     .from("cartas")
     .select(
-      "id, titulo, data_referencia, trilha, gestoras(nome), leituras(status, fila_kindle), comparacoes!carta_id(similaridade)",
+      "id, titulo, data_referencia, trilha, gestoras(nome), leituras(status, fila_kindle, favorito), comparacoes!carta_id(similaridade)",
     )
     .order("data_referencia", { ascending: false })
     .limit(limit);
@@ -77,13 +78,20 @@ export default async function HomePage({
     cartasQuery = cartasQuery.textSearch("busca", q, { type: "websearch", config: "portuguese" });
   }
 
-  const [{ data: gestorasComCartas }, lidoIds] = await Promise.all([
+  const [{ data: gestorasComCartas }, lidoIds, favoritoIds] = await Promise.all([
     gestorasQuery,
     naoLidos
       ? supabase
           .from("leituras")
           .select("carta_id")
           .eq("status", "lido")
+          .then((r) => r.data ?? [])
+      : Promise.resolve<{ carta_id: string }[]>([]),
+    favoritosSomente
+      ? supabase
+          .from("leituras")
+          .select("carta_id")
+          .eq("favorito", true)
           .then((r) => r.data ?? [])
       : Promise.resolve<{ carta_id: string }[]>([]),
   ]);
@@ -93,6 +101,10 @@ export default async function HomePage({
       "in",
       `(${lidoIds.map((l) => `"${l.carta_id}"`).join(",")})`,
     );
+  }
+  if (favoritosSomente) {
+    const ids = favoritoIds.map((f) => f.carta_id);
+    cartasQuery = cartasQuery.in("id", ids.length > 0 ? ids : ["__nenhuma__"]);
   }
 
   const { data: cartas, error } = await cartasQuery;

@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Search, Sparkles, X } from "lucide-react";
+import { Search, Sparkles, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -32,6 +32,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
   const [ate, setAte] = useState(searchParams.get("ate") ?? "");
   const [busca, setBusca] = useState(searchParams.get("q") ?? "");
   const [naoLidos, setNaoLidos] = useState(searchParams.get("naoLidos") === "1");
+  const [favoritos, setFavoritos] = useState(searchParams.get("favoritos") === "1");
   const [semantica, setSemantica] = useState(searchParams.get("modo") === "semantica");
 
   function aplicar(next: {
@@ -41,6 +42,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     ate?: string;
     q?: string;
     naoLidos?: boolean;
+    favoritos?: boolean;
     semantica?: boolean;
   }) {
     const g = next.gestoras ?? selecionadas;
@@ -49,6 +51,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     const a = next.ate ?? ate;
     const q = next.q ?? busca;
     const nl = next.naoLidos ?? naoLidos;
+    const fav = next.favoritos ?? favoritos;
     const sem = next.semantica ?? semantica;
 
     const params = new URLSearchParams();
@@ -58,6 +61,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     if (a) params.set("ate", a);
     if (q) params.set("q", q);
     if (nl) params.set("naoLidos", "1");
+    if (fav) params.set("favoritos", "1");
     if (sem && q) params.set("modo", "semantica");
 
     router.push(params.size > 0 ? `/?${params.toString()}` : "/");
@@ -85,8 +89,21 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
     aplicar({ naoLidos: next });
   }
 
+  function toggleFavoritos() {
+    const next = !favoritos;
+    setFavoritos(next);
+    aplicar({ favoritos: next });
+  }
+
   const temFiltro =
-    selecionadas.size > 0 || trilhasSel.size > 0 || de || ate || busca || naoLidos || semantica;
+    selecionadas.size > 0 ||
+    trilhasSel.size > 0 ||
+    de ||
+    ate ||
+    busca ||
+    naoLidos ||
+    favoritos ||
+    semantica;
 
   return (
     <div className="space-y-2">
@@ -189,27 +206,37 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
           Só não lidos
         </Button>
 
-        <input
-          type="date"
-          value={de}
-          onChange={(e) => {
-            setDe(e.target.value);
-            aplicar({ de: e.target.value });
-          }}
-          className="rounded-md border border-input bg-transparent px-2 py-1 text-sm"
-          aria-label="De"
-        />
-        <span className="text-sm text-muted-foreground">até</span>
-        <input
-          type="date"
-          value={ate}
-          onChange={(e) => {
-            setAte(e.target.value);
-            aplicar({ ate: e.target.value });
-          }}
-          className="rounded-md border border-input bg-transparent px-2 py-1 text-sm"
-          aria-label="Até"
-        />
+        <Button
+          variant={favoritos ? "default" : "outline"}
+          size="sm"
+          onClick={toggleFavoritos}
+        >
+          <Star className={favoritos ? "fill-current" : ""} /> Favoritos
+        </Button>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={de}
+            onChange={(e) => {
+              setDe(e.target.value);
+              aplicar({ de: e.target.value });
+            }}
+            className="w-[8.5rem] rounded-md border border-input bg-transparent px-2 py-1 text-sm"
+            aria-label="De"
+          />
+          <span className="text-sm text-muted-foreground">até</span>
+          <input
+            type="date"
+            value={ate}
+            onChange={(e) => {
+              setAte(e.target.value);
+              aplicar({ ate: e.target.value });
+            }}
+            className="w-[8.5rem] rounded-md border border-input bg-transparent px-2 py-1 text-sm"
+            aria-label="Até"
+          />
+        </div>
 
         {temFiltro && (
           <Button
@@ -222,6 +249,7 @@ export function FiltrosBar({ gestoras }: { gestoras: GestoraOption[] }) {
               setAte("");
               setBusca("");
               setNaoLidos(false);
+              setFavoritos(false);
               setSemantica(false);
               router.push("/");
             }}

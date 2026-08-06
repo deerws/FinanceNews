@@ -115,6 +115,25 @@ export async function revogarDeviceToken(id: string) {
   // lista localmente, refresh() aqui só adiciona risco sem necessidade.
 }
 
+export async function alternarFavorito(cartaId: string, ativar: boolean) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Não autenticado");
+
+  const { error } = await supabase.from("leituras").upsert(
+    {
+      user_id: user.id,
+      carta_id: cartaId,
+      favorito: ativar,
+      favorito_em: ativar ? new Date().toISOString() : null,
+    },
+    { onConflict: "user_id,carta_id" },
+  );
+  if (error) throw new Error(error.message);
+}
+
 export async function alternarFilaKindle(cartaId: string, ativar: boolean) {
   const supabase = await createClient();
   const {

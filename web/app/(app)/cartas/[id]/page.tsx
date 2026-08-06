@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { LIMIAR_MUDANCA_SIGNIFICATIVA } from "@/lib/mudanca";
+import { classificarMudanca } from "@/lib/mudanca";
 import { ReadingControls } from "./reading-controls";
 import { ConteudoTexto } from "./conteudo-texto";
 import { MarcarLidoButton } from "./marcar-lido-button";
@@ -11,6 +11,9 @@ import { CompartilharMenu } from "./compartilhar-menu";
 import { MudancaPainel } from "./mudanca-painel";
 import { AudioPlayer } from "./audio-player";
 import { FilaKindleButton } from "../../fila-kindle-button";
+import { FavoritoButton } from "../../favorito-button";
+import { CartasRelacionadas } from "./cartas-relacionadas";
+import { buscarCartasRelacionadas } from "@/lib/cartas-relacionadas";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -68,7 +71,7 @@ export default async function CartaPage({
     supabase
       .from("cartas")
       .select(
-        "id, titulo, data_referencia, trilha, url_origem, conteudo_txt, n_paginas, gestoras(nome), leituras(status, fila_kindle)",
+        "id, titulo, data_referencia, trilha, url_origem, conteudo_txt, n_paginas, gestoras(nome), leituras(status, fila_kindle, favorito)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -85,20 +88,21 @@ export default async function CartaPage({
   const gestoraNome = Array.isArray(gestoraRel) ? gestoraRel[0]?.nome : gestoraRel?.nome;
   const lido = carta.leituras?.[0]?.status === "lido";
   const naFilaKindle = carta.leituras?.[0]?.fila_kindle === true;
+  const favorito = carta.leituras?.[0]?.favorito === true;
   const secoes = extrairSecoes(carta.conteudo_txt);
   const temSumario = secoes.length > 1;
 
-  const mudouSignificativamente =
-    comparacao?.carta_anterior_id != null &&
-    comparacao.similaridade != null &&
-    comparacao.similaridade < LIMIAR_MUDANCA_SIGNIFICATIVA;
-  const { data: cartaAnterior } = mudouSignificativamente
+  const cartaAnteriorId = comparacao?.carta_anterior_id ?? null;
+  const severidadeMudanca = cartaAnteriorId ? classificarMudanca(comparacao?.similaridade) : null;
+  const { data: cartaAnterior } = severidadeMudanca
     ? await supabase
         .from("cartas")
         .select("titulo, data_referencia, gestoras(nome)")
-        .eq("id", comparacao.carta_anterior_id!)
+        .eq("id", cartaAnteriorId)
         .maybeSingle()
     : { data: null };
+
+  const cartasRelacionadas = await buscarCartasRelacionadas(carta.id, carta.data_referencia);
 
   return (
     <div className="mx-auto max-w-5xl p-4 lg:p-8">
@@ -148,16 +152,18 @@ export default async function CartaPage({
               />
               <AudioPlayer cartaId={carta.id} />
               <FilaKindleButton cartaId={carta.id} naFilaInicial={naFilaKindle} />
+              <FavoritoButton cartaId={carta.id} favoritoInicial={favorito} />
             </div>
           </div>
 
           <hr className="mb-6 border-t-2 border-foreground" />
 
-          {mudouSignificativamente && comparacao?.carta_anterior_id && (
+          {severidadeMudanca && cartaAnteriorId && (
             <MudancaPainel
-              cartaAnteriorId={comparacao.carta_anterior_id}
+              severidade={severidadeMudanca}
+              cartaAnteriorId={cartaAnteriorId}
               cartaAnteriorTitulo={cartaAnterior?.titulo ?? "carta anterior"}
-              trechos={(comparacao.trechos_novos as
+              trechos={(comparacao?.trechos_novos as
                 | { secao: string | null; texto: string; similaridade: number }[]
                 | null) ?? []}
             />
@@ -166,6 +172,8 @@ export default async function CartaPage({
           {temSumario && <Sumario secoes={secoes} className="mb-8 lg:hidden" />}
 
           <ConteudoTexto texto={carta.conteudo_txt} />
+
+          <CartasRelacionadas cartas={cartasRelacionadas} />
         </div>
       </div>
     </div>
