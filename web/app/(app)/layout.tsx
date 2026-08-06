@@ -19,9 +19,9 @@ export default async function AppLayout({
     <div className="min-h-dvh">
       <header className="border-b-4 border-double border-foreground px-4 pb-2 pt-4">
         <div className="mx-auto flex max-w-2xl items-end justify-between">
-          <span className="font-serif text-3xl font-semibold tracking-tight">
+          <Link href="/" className="font-serif text-3xl font-semibold tracking-tight">
             FinanceNews
-          </span>
+          </Link>
           <div className="flex items-center gap-1 text-xs text-muted-foreground sm:gap-3">
             <span className="hidden sm:inline">{user?.email}</span>
             <ThemeToggle />
