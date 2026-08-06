@@ -35,8 +35,14 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute =
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/auth");
+  // /api/opds/* tem seu próprio auth (HTTP Basic via device token, ver
+  // lib/opds/auth.ts) — o cliente OPDS do KOReader não manda cookie de
+  // sessão nenhum. Um 302 pra /login aqui quebraria o cliente; ele precisa
+  // de um 401 de verdade com WWW-Authenticate pra saber que deve mandar
+  // Basic Auth.
+  const isOpdsRoute = request.nextUrl.pathname.startsWith("/api/opds");
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isOpdsRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

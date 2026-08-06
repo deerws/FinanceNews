@@ -10,6 +10,7 @@ import { MarcarLidoButton } from "./marcar-lido-button";
 import { CompartilharMenu } from "./compartilhar-menu";
 import { MudancaPainel } from "./mudanca-painel";
 import { AudioPlayer } from "./audio-player";
+import { FilaKindleButton } from "../../fila-kindle-button";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -67,7 +68,7 @@ export default async function CartaPage({
     supabase
       .from("cartas")
       .select(
-        "id, titulo, data_referencia, trilha, url_origem, conteudo_txt, n_paginas, gestoras(nome), leituras(status)",
+        "id, titulo, data_referencia, trilha, url_origem, conteudo_txt, n_paginas, gestoras(nome), leituras(status, fila_kindle)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -83,6 +84,7 @@ export default async function CartaPage({
   const gestoraRel = carta.gestoras as { nome: string } | { nome: string }[] | null;
   const gestoraNome = Array.isArray(gestoraRel) ? gestoraRel[0]?.nome : gestoraRel?.nome;
   const lido = carta.leituras?.[0]?.status === "lido";
+  const naFilaKindle = carta.leituras?.[0]?.fila_kindle === true;
   const secoes = extrairSecoes(carta.conteudo_txt);
   const temSumario = secoes.length > 1;
 
@@ -145,6 +147,7 @@ export default async function CartaPage({
                 nPaginas={carta.n_paginas}
               />
               <AudioPlayer cartaId={carta.id} />
+              <FilaKindleButton cartaId={carta.id} naFilaInicial={naFilaKindle} />
             </div>
           </div>
 

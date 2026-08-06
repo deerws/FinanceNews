@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LIMIAR_MUDANCA_SIGNIFICATIVA } from "@/lib/mudanca";
+import { FilaKindleButton } from "./fila-kindle-button";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -14,7 +15,7 @@ export type CartaListItem = {
   data_referencia: string;
   trilha: string;
   gestoras: { nome: string } | { nome: string }[] | null;
-  leituras: { status: string }[] | null;
+  leituras: { status: string; fila_kindle: boolean }[] | null;
   // carta_id em `comparacoes` é chave primária (1:1), então o PostgREST
   // embeda como objeto único, não array — diferente de `leituras`, cuja
   // chave (user_id, carta_id) permite várias linhas por carta.
@@ -42,6 +43,7 @@ function formatarData(dataRef: string): string {
 
 export function CartaCard({ carta }: { carta: CartaListItem }) {
   const lido = carta.leituras?.[0]?.status === "lido";
+  const naFilaKindle = carta.leituras?.[0]?.fila_kindle === true;
   const similaridade = similaridadeMudanca(carta);
   const mudou = similaridade != null && similaridade < LIMIAR_MUDANCA_SIGNIFICATIVA;
 
@@ -67,9 +69,12 @@ export function CartaCard({ carta }: { carta: CartaListItem }) {
           </span>
         )}
       </div>
-      <p className="font-serif text-xl font-semibold leading-snug group-hover:underline">
-        {carta.titulo}
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-serif text-xl font-semibold leading-snug group-hover:underline">
+          {carta.titulo}
+        </p>
+        <FilaKindleButton cartaId={carta.id} naFilaInicial={naFilaKindle} compact />
+      </div>
       <p className="font-sans text-sm text-muted-foreground">{nomeGestora(carta)}</p>
     </Link>
   );

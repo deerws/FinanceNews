@@ -40,7 +40,7 @@ export default async function HomePage({
   let cartasQuery = supabase
     .from("cartas")
     .select(
-      "id, titulo, data_referencia, trilha, gestoras(nome), leituras(status), comparacoes!carta_id(similaridade)",
+      "id, titulo, data_referencia, trilha, gestoras(nome), leituras(status, fila_kindle), comparacoes!carta_id(similaridade)",
     )
     .order("data_referencia", { ascending: false })
     .limit(limit);
