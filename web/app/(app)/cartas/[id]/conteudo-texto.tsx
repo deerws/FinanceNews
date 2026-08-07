@@ -2,7 +2,9 @@
 
 import { useTamanhoLeitura, tamanhoClass } from "./reading-controls";
 
-export function ConteudoTexto({ texto }: { texto: string }) {
+const FIGURA_RE = /^\[\[FIGURA:(\d+)\]\]$/;
+
+export function ConteudoTexto({ texto, cartaId }: { texto: string; cartaId: string }) {
   const tamanho = useTamanhoLeitura();
   const blocos = texto.split(/\n{2,}/).filter((b) => b.trim());
 
@@ -11,8 +13,24 @@ export function ConteudoTexto({ texto }: { texto: string }) {
   return (
     <div className={`${tamanhoClass(tamanho)} max-w-prose font-serif`}>
       {blocos.map((bloco, i) => {
+        const conteudoBruto = bloco.trim();
+        const matchFigura = conteudoBruto.match(FIGURA_RE);
+        if (matchFigura) {
+          const ordem = matchFigura[1];
+          return (
+            // eslint-disable-next-line @next/next/no-img-element -- imagem vem de uma rota autenticada, não dá pra usar next/image com domínio fixo
+            <img
+              key={i}
+              src={`/api/cartas/${cartaId}/figuras/${ordem}`}
+              alt="Gráfico ou tabela extraído da carta"
+              loading="lazy"
+              className="mb-5 w-full max-w-full border border-border"
+            />
+          );
+        }
+
         const isHeading = bloco.startsWith("## ");
-        const conteudo = isHeading ? bloco.slice(3).trim() : bloco.trim();
+        const conteudo = isHeading ? bloco.slice(3).trim() : conteudoBruto;
 
         if (isHeading) {
           indiceSecao += 1;

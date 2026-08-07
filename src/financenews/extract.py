@@ -6,16 +6,23 @@ from pathlib import Path
 import pdfplumber
 from bs4 import BeautifulSoup
 
+from .graficos import FiguraDetectada, detectar_figuras
 
-def extract_text(raw_path: Path, html_content: str | None = None) -> str:
+
+def extract_text(raw_path: Path, html_content: str | None = None) -> tuple[str, list[FiguraDetectada]]:
     if raw_path.suffix.lower() == ".pdf":
         return _extract_pdf(raw_path)
     if html_content is not None:
-        return _extract_html(html_content)
-    return _extract_html(raw_path.read_text(encoding="utf-8"))
+        return _extract_html(html_content), []
+    return _extract_html(raw_path.read_text(encoding="utf-8")), []
 
 
-def _extract_pdf(path: Path) -> str:
+def _obj_dentro_de_alguma(obj: dict, bboxes: list[tuple[float, float, float, float]]) -> bool:
+    x0, top, x1, bottom = obj.get("x0", 0), obj.get("top", 0), obj.get("x1", 0), obj.get("bottom", 0)
+    return any(x0 < b[2] and b[0] < x1 and top < b[3] and b[1] < bottom for b in bboxes)
+
+
+def _extract_pdf(path: Path) -> tuple[str, list[FiguraDetectada]]:
     # x_tolerance mais baixo que o padrão (3): o padrão junta palavras curtas
     # (a, de, na...) com a palavra seguinte quando o espaçamento do PDF é
     # apertado (comum em texto justificado) — ex.: "a taxa" virava "ataxa".
@@ -24,14 +31,38 @@ def _extract_pdf(path: Path) -> str:
     # quebra de linha do PDF — inclusive quebra no meio de uma frase por
     # causa da largura da página — vira \n, e não dá pra distinguir quebra
     # de parágrafo de quebra de linha).
-    items: list[tuple[str, bool]] = []  # (texto, é_negrito)
+    #
+    # Regiões de gráfico/tabela detectadas (graficos.py) são mascaradas
+    # ANTES da extração de texto (page.filter) — quando têm texto real
+    # embaixo (ex.: cabeçalho de tabela), esse texto saía solto no meio do
+    # parágrafo errado; quando não têm (gráfico 100% desenhado/imagem),
+    # não muda nada no texto, mas o marcador [[FIGURA:n]] entra no lugar
+    # certo pra virar imagem de verdade na leitura.
+    figuras = detectar_figuras(str(path))
+    figuras_por_pagina: dict[int, list[FiguraDetectada]] = {}
+    for fig in figuras:
+        figuras_por_pagina.setdefault(fig.pagina, []).append(fig)
+
+    items: list[tuple[str, bool]] = []  # (texto, é_negrito) — marcador de figura entra como texto puro
+    ordem_global = 0
     with pdfplumber.open(path) as pdf:
-        for page in pdf.pages:
-            raw = page.extract_text(x_tolerance=1.5, layout=True) or ""
+        for page_idx, page in enumerate(pdf.pages):
+            figs_pagina = figuras_por_pagina.get(page_idx, [])
+            if figs_pagina:
+                bboxes = [f.bbox for f in figs_pagina]
+                page_para_texto = page.filter(lambda obj: not _obj_dentro_de_alguma(obj, bboxes))
+            else:
+                page_para_texto = page
+
+            raw = page_para_texto.extract_text(x_tolerance=1.5, layout=True) or ""
             paragraphs = _paragraphs_from_layout_text(raw)
-            bold_lines = _bold_line_texts(page)
+            bold_lines = _bold_line_texts(page_para_texto)
             for para in paragraphs:
                 items.append((para, para in bold_lines))
+
+            for _fig in figs_pagina:
+                items.append((f"[[FIGURA:{ordem_global}]]", False))
+                ordem_global += 1
 
     # Cabeçalho/rodapé repetido (ex.: "Carta Mensal Junho/2026" em toda
     # página) costuma vir em negrito também — sem filtrar isso, cada
@@ -47,7 +78,7 @@ def _extract_pdf(path: Path) -> str:
         if negrito and bold_counts[texto] > 1:
             continue  # repetido em várias páginas — ruído de cabeçalho/rodapé
         output.append(f"## {texto}" if negrito else texto)
-    return "\n\n".join(output).strip()
+    return "\n\n".join(output).strip(), figuras
 
 
 def _paragraphs_from_layout_text(raw: str) -> list[str]:

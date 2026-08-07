@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 import datetime
+import json
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -12,7 +14,7 @@ from .fetch import Fetcher
 from .index_store import IndexStore
 from .models import LetterRecord
 from .registry import load_sources
-from .storage import DEFAULT_ROOT, raw_path, slugify, txt_path
+from .storage import DEFAULT_ROOT, figuras_path, raw_path, slugify, txt_path
 from .strategies import discover
 
 app = typer.Typer(add_completion=False)
@@ -69,16 +71,21 @@ def crawl(
                         content = resp.content
                         raw = raw_path(src.trilha, sid, cand.ano, cand.mes, slug, "pdf")
                         raw.write_bytes(content)
-                        text = extract_text(raw)
+                        text, figuras = extract_text(raw)
                     else:
                         html_content = cand.html_content or ""
                         content = html_content.encode("utf-8")
                         raw = raw_path(src.trilha, sid, cand.ano, cand.mes, slug, "html")
                         raw.write_text(html_content, encoding="utf-8")
-                        text = extract_text(raw, html_content=html_content)
+                        text, figuras = extract_text(raw, html_content=html_content)
 
                     txt = txt_path(raw)
                     txt.write_text(text, encoding="utf-8")
+                    if figuras:
+                        figuras_json = [
+                            {"ordem": i, **dataclasses.asdict(f)} for i, f in enumerate(figuras)
+                        ]
+                        figuras_path(raw).write_text(json.dumps(figuras_json), encoding="utf-8")
 
                     record = LetterRecord(
                         id=key,
@@ -140,11 +147,11 @@ def ingest() -> None:
     from .ingest import ingest as run_ingest
 
     load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
-    n_gestoras, n_cartas, n_notificacoes, n_indexadas, n_comparadas = run_ingest()
+    n_gestoras, n_cartas, n_notificacoes, n_indexadas, n_comparadas, n_figuras = run_ingest()
     typer.echo(
         f"Sincronizado: {n_gestoras} gestoras, {n_cartas} cartas, "
         f"{n_notificacoes} notificações enviadas, {n_indexadas} cartas indexadas p/ busca semântica, "
-        f"{n_comparadas} comparadas com a carta anterior."
+        f"{n_comparadas} comparadas com a carta anterior, {n_figuras} cartas com gráficos extraídos."
     )
 
 

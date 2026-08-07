@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
@@ -10,11 +11,13 @@ from supabase import Client, create_client
 
 from .dates import MESES_COMPLETO
 from .embeddings import chunk_carta, embed_passages
+from .graficos import FiguraDetectada, rasterizar
 from .index_store import IndexStore
+from .models import LetterRecord
 from .mudancas import comparar_cartas
 from .notify import notificar_cartas_novas
 from .registry import load_sources
-from .storage import DEFAULT_ROOT
+from .storage import DEFAULT_ROOT, figuras_path
 
 _BATCH = 50
 _MAX_TENTATIVAS = 3
@@ -176,13 +179,81 @@ def _comparar_cartas_pendentes(client: Client, cartas_payload: list[dict]) -> in
     return sum(1 for c in comparacoes_payload if c["similaridade"] is not None)
 
 
-def ingest() -> tuple[int, int, int, int, int]:
+def _extrair_graficos_pendentes(client: Client, letters: list[LetterRecord], repo_root: Path) -> int:
+    """Sobe pro Storage as figuras já detectadas no crawl (sidecar
+    `.figuras.json` ao lado do PDF, ver extract.py/graficos.py) — a
+    detecção roda uma vez só, no crawl; aqui só rasteriza (determinístico,
+    dado o mesmo bbox) e envia. Idempotente: só processa carta que ainda
+    não tem nenhuma linha em `figuras` (carta sem gráfico nenhum, ou
+    HTML-origem, nunca tem sidecar e é pulada sempre — barato o bastante
+    pra não precisar marcar "já verificado, zero gráficos").
+    """
+    ids = [l.id for l in letters]
+    ja_tem: set[str] = set()
+    for i in range(0, len(ids), _BATCH):
+        lote = ids[i : i + _BATCH]
+        # .eq("ordem", 0): mesmo motivo do _embed_cartas_pendentes — sem
+        # isso, carta com muitas figuras podia estourar o limite padrão de
+        # 1000 linhas do PostgREST e sumir do resultado.
+        rows = client.table("figuras").select("carta_id").in_("carta_id", lote).eq("ordem", 0).execute().data
+        ja_tem.update(r["carta_id"] for r in rows)
+
+    processadas = 0
+    for letter in letters:
+        if letter.id in ja_tem:
+            continue
+        raw = repo_root / letter.arquivo_raw
+        sidecar = figuras_path(raw)
+        if not sidecar.exists():
+            continue
+        try:
+            metas = json.loads(sidecar.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not metas:
+            continue
+
+        linhas = []
+        for meta in metas:
+            fig = FiguraDetectada(pagina=meta["pagina"], bbox=tuple(meta["bbox"]))
+            try:
+                png, largura, altura = rasterizar(str(raw), fig)
+            except Exception:  # noqa: BLE001 - 1 figura ruim não pode travar a carta inteira
+                continue
+            storage_path = f"{letter.gestora}/{letter.id}/{meta['ordem']}.png"
+            try:
+                client.storage.from_("graficos").upload(
+                    storage_path, png, {"content-type": "image/png", "upsert": "true"}
+                )
+            except Exception:  # noqa: BLE001 - idem
+                continue
+            linhas.append(
+                {
+                    "carta_id": letter.id,
+                    "ordem": meta["ordem"],
+                    "pagina": meta["pagina"],
+                    "bbox": meta["bbox"],
+                    "storage_path": storage_path,
+                    "largura": largura,
+                    "altura": altura,
+                }
+            )
+        if linhas:
+            _upsert_in_batches(client, "figuras", linhas, on_conflict="carta_id,ordem")
+            processadas += 1
+    return processadas
+
+
+def ingest() -> tuple[int, int, int, int, int, int]:
     """Sincroniza gestoras + cartas com o Supabase. Idempotente (upsert por id).
     Notifica por push/e-mail quem segue a gestora de cada carta genuinamente
-    nova, gera embeddings (busca semântica) pra cartas que ainda não têm, e
-    compara cada carta com a anterior da mesma gestora (detector de mudança).
+    nova, gera embeddings (busca semântica) pra cartas que ainda não têm,
+    compara cada carta com a anterior da mesma gestora (detector de
+    mudança), e sobe pro Storage os gráficos/tabelas já detectados no
+    crawl.
 
-    Retorna (n_gestoras, n_cartas, n_notificacoes, n_cartas_indexadas, n_cartas_comparadas).
+    Retorna (n_gestoras, n_cartas, n_notificacoes, n_cartas_indexadas,
+    n_cartas_comparadas, n_cartas_com_figuras).
     """
     client = _client()
     sources = load_sources()
@@ -245,5 +316,6 @@ def ingest() -> tuple[int, int, int, int, int]:
     n_notificacoes = notificar_cartas_novas(client, novas)
     n_indexadas = _embed_cartas_pendentes(client, cartas_payload)
     n_comparadas = _comparar_cartas_pendentes(client, cartas_payload)
+    n_figuras = _extrair_graficos_pendentes(client, letters, repo_root)
 
-    return len(gestoras_payload), len(cartas_payload), n_notificacoes, n_indexadas, n_comparadas
+    return len(gestoras_payload), len(cartas_payload), n_notificacoes, n_indexadas, n_comparadas, n_figuras

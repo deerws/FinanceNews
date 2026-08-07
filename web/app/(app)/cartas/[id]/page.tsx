@@ -171,7 +171,7 @@ export default async function CartaPage({
 
           {temSumario && <Sumario secoes={secoes} className="mb-8 lg:hidden" />}
 
-          <ConteudoTexto texto={carta.conteudo_txt} />
+          <ConteudoTexto texto={carta.conteudo_txt} cartaId={carta.id} />
 
           <CartasRelacionadas cartas={cartasRelacionadas} />
         </div>

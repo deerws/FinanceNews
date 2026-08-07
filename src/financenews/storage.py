@@ -25,3 +25,7 @@ def raw_path(trilha: str, gestora: str, ano: int, mes: int, slug: str, ext: str,
 
 def txt_path(raw: Path) -> Path:
     return raw.with_suffix(".txt")
+
+
+def figuras_path(raw: Path) -> Path:
+    return raw.parent / f"{raw.stem}.figuras.json"
