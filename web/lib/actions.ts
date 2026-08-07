@@ -11,6 +11,26 @@ export async function signOut() {
   redirect("/login");
 }
 
+// Login roda no servidor (não no client via createBrowserClient) de
+// propósito: o client escreve a sessão em cookie via document.cookie, e o
+// Safari (inclusive PWA instalado na tela inicial do iOS) limita cookie
+// escrito por script a 7 dias, não importa o maxAge pedido — por isso a
+// sessão "esquecia" o login depois de uma semana. Cookie setado aqui vira
+// um Set-Cookie de resposta HTTP de verdade, sem esse limite.
+export async function entrarComSenha(email: string, senha: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+  if (error) return { erro: error.message };
+  redirect("/");
+}
+
+export async function cadastrarComSenha(email: string, senha: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signUp({ email, password: senha });
+  if (error) return { erro: error.message };
+  return { ok: true as const };
+}
+
 export async function marcarLeitura(cartaId: string, status: "lido" | "pendente") {
   const supabase = await createClient();
   const {

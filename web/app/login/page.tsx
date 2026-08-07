@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { entrarComSenha, cadastrarComSenha } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 
 const ERRO_LABEL: Record<string, string> = {
@@ -15,7 +14,6 @@ const ERRO_LABEL: Record<string, string> = {
 type Modo = "entrar" | "cadastrar";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [modo, setModo] = useState<Modo>("entrar");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -39,16 +37,11 @@ export default function LoginPage() {
     setStatus("enviando");
     setErro(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-
-    if (error) {
+    const resultado = await entrarComSenha(email, senha);
+    if (resultado?.erro) {
       setStatus("erro");
-      setErro(ERRO_LABEL.invalid_credentials ?? error.message);
-      return;
+      setErro(ERRO_LABEL.invalid_credentials ?? resultado.erro);
     }
-    router.push("/");
-    router.refresh();
   }
 
   async function handleCadastrar(e: React.FormEvent) {
@@ -67,12 +60,11 @@ export default function LoginPage() {
     }
 
     setStatus("enviando");
-    const supabase = createClient();
-    const { error } = await supabase.auth.signUp({ email, password: senha });
+    const resultado = await cadastrarComSenha(email, senha);
 
-    if (error) {
+    if (resultado?.erro) {
       setStatus("erro");
-      setErro(error.message);
+      setErro(resultado.erro);
       return;
     }
     setStatus("cadastrado");
@@ -98,6 +90,14 @@ export default function LoginPage() {
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-2 border-b-4 border-double border-foreground pb-4 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element -- marca fixa, não precisa de otimização do next/image */}
+          <img
+            src="/shark-mark.png"
+            alt=""
+            width={64}
+            height={64}
+            className="mx-auto size-16 dark:invert"
+          />
           <h1 className="font-serif text-4xl font-bold tracking-tight">
             FinanceNews
           </h1>

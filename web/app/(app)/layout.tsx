@@ -19,7 +19,9 @@ export default async function AppLayout({
     <div className="min-h-dvh">
       <header className="border-b-4 border-double border-foreground px-4 pb-2 pt-4">
         <div className="mx-auto flex max-w-2xl items-end justify-between">
-          <Link href="/" className="font-serif text-3xl font-semibold tracking-tight">
+          <Link href="/" className="flex items-center gap-2 font-serif text-3xl font-semibold tracking-tight">
+            {/* eslint-disable-next-line @next/next/no-img-element -- marca fixa, não precisa de otimização do next/image */}
+            <img src="/shark-mark.png" alt="" width={32} height={32} className="size-8 dark:invert" />
             FinanceNews
           </Link>
           <div className="flex items-center gap-1 text-xs text-muted-foreground sm:gap-3">

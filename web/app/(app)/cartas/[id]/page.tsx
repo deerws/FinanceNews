@@ -160,7 +160,6 @@ export default async function CartaPage({
 
           {severidadeMudanca && cartaAnteriorId && (
             <MudancaPainel
-              severidade={severidadeMudanca}
               cartaAnteriorId={cartaAnteriorId}
               cartaAnteriorTitulo={cartaAnterior?.titulo ?? "carta anterior"}
               trechos={(comparacao?.trechos_novos as

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { classificarMudanca, SEVERIDADE_CLASSES, SEVERIDADE_LABEL } from "@/lib/mudanca";
-import { FilaKindleButton } from "./fila-kindle-button";
 import { FavoritoButton } from "./favorito-button";
+import { MarcarLidoButton } from "./cartas/[id]/marcar-lido-button";
 
 const TRILHA_LABEL: Record<string, string> = {
   equity_br: "Equity BR",
@@ -16,7 +16,7 @@ export type CartaListItem = {
   data_referencia: string;
   trilha: string;
   gestoras: { nome: string } | { nome: string }[] | null;
-  leituras: { status: string; fila_kindle: boolean; favorito: boolean }[] | null;
+  leituras: { status: string; favorito: boolean }[] | null;
   // carta_id em `comparacoes` é chave primária (1:1), então o PostgREST
   // embeda como objeto único, não array — diferente de `leituras`, cuja
   // chave (user_id, carta_id) permite várias linhas por carta.
@@ -44,7 +44,6 @@ function formatarData(dataRef: string): string {
 
 export function CartaCard({ carta }: { carta: CartaListItem }) {
   const lido = carta.leituras?.[0]?.status === "lido";
-  const naFilaKindle = carta.leituras?.[0]?.fila_kindle === true;
   const favorito = carta.leituras?.[0]?.favorito === true;
   const similaridade = similaridadeMudanca(carta);
   const severidade = classificarMudanca(similaridade);
@@ -60,11 +59,6 @@ export function CartaCard({ carta }: { carta: CartaListItem }) {
         <span className="font-sans font-normal normal-case tracking-normal text-muted-foreground">
           {formatarData(carta.data_referencia)}
         </span>
-        {lido && (
-          <span className="font-sans font-normal normal-case tracking-normal text-muted-foreground">
-            · lido
-          </span>
-        )}
         {severidade && (
           <span className={`font-sans font-normal normal-case tracking-normal ${SEVERIDADE_CLASSES[severidade]}`}>
             · {SEVERIDADE_LABEL[severidade]}
@@ -77,7 +71,7 @@ export function CartaCard({ carta }: { carta: CartaListItem }) {
         </p>
         <div className="flex shrink-0 items-center">
           <FavoritoButton cartaId={carta.id} favoritoInicial={favorito} compact />
-          <FilaKindleButton cartaId={carta.id} naFilaInicial={naFilaKindle} compact />
+          <MarcarLidoButton cartaId={carta.id} lidoInicial={lido} compact />
         </div>
       </div>
       <p className="font-sans text-sm text-muted-foreground">{nomeGestora(carta)}</p>

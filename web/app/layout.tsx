@@ -23,6 +23,11 @@ export const metadata: Metadata = {
   description: "Cartas de gestores de investimento, organizadas pra leitura.",
   icons: {
     icon: [
+      // Favicon da aba: versão clara/escura conforme o tema do sistema —
+      // ícone de <link> não enxerga o toggle de tema da página (só roda
+      // fora do DOM), então só dá pra reagir ao prefers-color-scheme do SO.
+      { url: "/favicon-light.png", media: "(prefers-color-scheme: light)" },
+      { url: "/favicon-dark.png", media: "(prefers-color-scheme: dark)" },
       { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
       { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
     ],
