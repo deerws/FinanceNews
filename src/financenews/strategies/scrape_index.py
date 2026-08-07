@@ -165,12 +165,16 @@ def _discover_versa(source: Source, fetcher: Fetcher) -> list[Candidate]:
             continue
         post_soup = BeautifulSoup(post_resp.text, "lxml")
         title = post_soup.title.get_text().strip() if post_soup.title else href
-        article = post_soup.find("article") or post_soup.body
-        html_content = str(article) if article else post_resp.text
+        # O tema (Elementor) não usa <article> — cair pro <body> inteiro
+        # (versão antiga) trazia menu, sidebar, rodapé e formulário de
+        # cadastro junto com a carta. O bloco de verdade é este widget.
+        article = post_soup.find(class_="elementor-widget-theme-post-content")
+        if article is None:
+            continue
         candidates.append(
             Candidate(
                 source_id=source.id, url=href, ano=ano, mes=mes,
-                content_type="html", titulo=title, html_content=html_content,
+                content_type="html", titulo=title, html_content=str(article),
             )
         )
     return candidates

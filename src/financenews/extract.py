@@ -121,9 +121,23 @@ def _bold_line_texts(page: pdfplumber.page.Page) -> set[str]:
     return bold_texts
 
 
+_HTML_BLOCK_TAGS = ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br", "figure"]
+
+
 def _extract_html(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
-    text = soup.get_text(separator="\n")
+    for tag in soup(["script", "style"]):
+        tag.decompose()
+    # separator="\n" quebra linha em TODA fronteira de tag, inclusive as
+    # inline (<strong>, <em>, <a>) — "tax<strong>shield</strong>" virava
+    # "tax\nshield". Marca quebra de parágrafo manualmente só nos blocos de
+    # verdade e usa espaço como separador padrão, pra texto dentro de tags
+    # inline ficar na mesma linha.
+    for tag in soup.find_all(_HTML_BLOCK_TAGS):
+        tag.insert_after("\n\n")
+    text = soup.get_text(separator=" ").replace("\xa0", " ")
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n[ \t]+", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
     return text.strip()
