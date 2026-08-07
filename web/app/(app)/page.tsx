@@ -33,6 +33,12 @@ export default async function HomePage({
 
   const supabase = await createClient();
 
+  // Só pra distinguir, no estado vazio, "seus filtros não bateram com nada"
+  // de "sua conta não está na allowlist" — os dois produzem 0 linhas por
+  // causa da RLS (is_allowed()), mas são situações bem diferentes pro
+  // usuário entender.
+  const { data: temAcesso } = await supabase.rpc("is_allowed");
+
   const gestorasQuery = supabase
     .from("gestoras")
     .select("id, nome, cartas(count)")
@@ -144,7 +150,13 @@ export default async function HomePage({
         {(cartas as unknown as CartaListItem[] | null)?.map((carta) => (
           <CartaCard key={carta.id} carta={carta} />
         ))}
-        {cartas?.length === 0 && (
+        {cartas?.length === 0 && !temAcesso && (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Sua conta ainda não tem acesso liberado. Peça pra quem administra
+            o FinanceNews adicionar seu e-mail na lista de acesso.
+          </p>
+        )}
+        {cartas?.length === 0 && temAcesso && (
           <p className="py-8 text-center text-sm text-muted-foreground">
             Nenhuma carta encontrada com esses filtros.
           </p>
